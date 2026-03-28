@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@theme {
+  --color-parchment-50: #fbf8f1;
+  --color-parchment-100: #f4ebd8;
+  --color-parchment-200: #e8d5b5;
+  --color-parchment-300: #d5b990;
+  
+  --color-ink-800: #3a2e28;
+  --color-ink-900: #231b17;
+  
+  --color-accent-primary: #8b5a2b;
+  --color-accent-hover: #6b4423;
+}
+
+@layer base {
+  body {
+    @apply bg-parchment-50 text-ink-800;
+  }
+}
