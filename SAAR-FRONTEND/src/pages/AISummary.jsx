@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { useLocation } from 'react-router-dom';
 import { FileText, Download, Sparkles, Search } from 'lucide-react';
 import { apiFetch, fileUrl } from '../lib/api';
@@ -137,7 +138,7 @@ export default function AISummary() {
           ) : summaryText ? (
             <div className="space-y-4">
               <h3 className="text-accent-primary font-bold">{noteTitle}</h3>
-              <div className="prose prose-sm max-w-none text-ink-900 whitespace-pre-wrap">{summaryText}</div>
+              <div className="prose prose-sm max-w-none text-ink-900"><ReactMarkdown>{summaryText}</ReactMarkdown></div>
             </div>
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-4">
