@@ -10,6 +10,9 @@ import BookExchange from './pages/BookExchange';
 import UploadPortal from './pages/UploadPortal';
 import AdminDashboard from './pages/AdminDashboard';
 import Profile from './pages/Profile';
+import PYQRepository from './pages/PYQRepository';
+import Chat from './pages/Chat';
+import Inbox from './pages/Inbox';
 
 function App() {
   return (
@@ -24,6 +27,9 @@ function App() {
           <Route path="book-exchange" element={<BookExchange />} />
           <Route path="upload" element={<ProtectedRoute><UploadPortal /></ProtectedRoute>} />
           <Route path="profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="pyqs" element={<PYQRepository />} />
+          <Route path="inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
+          <Route path="chat/:id" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
           <Route path="admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
         </Route>
       </Routes>

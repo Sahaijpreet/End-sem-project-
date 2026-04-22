@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { UserCircle, FileText, BookOpen, Mail, IdCard, Edit2, Check, X } from 'lucide-react';
+import { UserCircle, FileText, BookOpen, Mail, IdCard, Edit2, Check, X, ArrowLeftRight } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -9,6 +9,7 @@ export default function Profile() {
   const toast = useToast();
   const [notes, setNotes] = useState([]);
   const [books, setBooks] = useState([]);
+  const [exchanges, setExchanges] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(user?.Name || '');
@@ -20,10 +21,12 @@ export default function Profile() {
     Promise.all([
       apiFetch('/api/notes', { skipAuth: true }),
       apiFetch('/api/books', { skipAuth: true }),
-    ]).then(([nRes, bRes]) => {
+      apiFetch('/api/chat/conversations'),
+    ]).then(([nRes, bRes, cRes]) => {
       if (cancelled) return;
       setNotes(nRes.success && Array.isArray(nRes.data) ? nRes.data : []);
       setBooks(bRes.success && Array.isArray(bRes.data) ? bRes.data : []);
+      setExchanges(cRes.success ? cRes.data.filter((c) => c.ExchangeCompleted) : []);
     }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
@@ -177,6 +180,35 @@ export default function Profile() {
                 }`}>{b.Status}</span>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Exchange history */}
+        <div className="bg-white rounded-xl border border-parchment-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-parchment-200">
+            <h2 className="font-bold text-ink-900 flex items-center gap-2"><ArrowLeftRight className="h-5 w-5 text-emerald-500" /> Exchange History</h2>
+          </div>
+          <div className="divide-y divide-parchment-100">
+            {loading ? <p className="p-6 text-sm text-ink-800">Loading…</p> : exchanges.length === 0 ? (
+              <p className="p-6 text-sm text-ink-800">No completed exchanges yet.</p>
+            ) : exchanges.map((e) => {
+              const uid = user?._id;
+              const isOwner = e.OwnerID?._id === uid || e.OwnerID === uid;
+              const other = isOwner ? e.RequesterID : e.OwnerID;
+              const book = e.BookSnapshot || e.BookID;
+              return (
+                <div key={e._id} className="px-6 py-4 flex justify-between items-center">
+                  <div>
+                    <p className="font-medium text-ink-900">{book?.Title || 'Unknown book'}</p>
+                    <p className="text-sm text-ink-800">{book?.Author} · {book?.Subject}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {isOwner ? 'Given to' : 'Received from'} <span className="font-medium text-ink-800">{other?.Name || 'User'}</span>
+                    </p>
+                  </div>
+                  <span className="text-xs font-semibold px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">Exchanged</span>
+                </div>
+              );
+            })}
           </div>
         </div>
 

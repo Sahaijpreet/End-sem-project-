@@ -3,21 +3,12 @@ import Note from '../models/Note.js';
 export const uploadNote = async (req, res) => {
   try {
     const { Title, Subject, Semester } = req.body;
-    
-    if (!req.file) {
+    if (!req.files?.document?.[0]) {
       return res.status(400).json({ success: false, message: 'Please upload a PDF file' });
     }
-    
-    const FileURL = `/uploads/${req.file.filename}`;
-
-    const note = await Note.create({
-      Title,
-      Subject,
-      Semester,
-      FileURL,
-      UploaderID: req.user._id
-    });
-
+    const FileURL = `/uploads/${req.files.document[0].filename}`;
+    const CoverImage = req.files?.cover?.[0] ? `/uploads/${req.files.cover[0].filename}` : '';
+    const note = await Note.create({ Title, Subject, Semester, FileURL, CoverImage, UploaderID: req.user._id });
     res.status(201).json({ success: true, data: note });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

@@ -1,14 +1,16 @@
 import express from 'express';
-import { getStats, deleteNote, listUsers } from '../controllers/adminController.js';
+import { getStats, deleteNote, listUsers, listAllNotes, listAllBooks, deleteBook } from '../controllers/adminController.js';
 import { protect, adminCheck } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// ALL routes in this file are protected and require Admin privileges
 router.use(protect, adminCheck);
 
 router.get('/stats', getStats);
 router.get('/users', listUsers);
+router.get('/notes', listAllNotes);
 router.delete('/notes/:id', deleteNote);
+router.get('/books', listAllBooks);
+router.delete('/books/:id', deleteBook);
 
 export default router;

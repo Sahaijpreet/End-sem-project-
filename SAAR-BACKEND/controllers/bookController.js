@@ -1,17 +1,12 @@
 import Book from '../models/Book.js';
 import ExchangeRequest from '../models/ExchangeRequest.js';
+import { createNotification } from './notificationController.js';
 
 export const listBook = async (req, res) => {
   try {
     const { Title, Author, Subject } = req.body;
-    
-    const book = await Book.create({
-      Title,
-      Author,
-      Subject,
-      OwnerID: req.user._id
-    });
-
+    const CoverImage = req.file ? `/uploads/${req.file.filename}` : '';
+    const book = await Book.create({ Title, Author, Subject, CoverImage, OwnerID: req.user._id });
     res.status(201).json({ success: true, data: book });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -71,7 +66,8 @@ export const requestExchange = async (req, res) => {
     // Update book status
     book.Status = 'Requested';
     await book.save();
-
+    // Notify owner
+    await createNotification(book.OwnerID, 'book_requested', `${req.user.Name || 'Someone'} requested your book "${book.Title}"`, '/book-exchange');
     res.status(201).json({ success: true, data: exchangeRequest });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -104,10 +100,12 @@ export const respondToRequest = async (req, res) => {
       request.Status = 'Accepted';
       request.BookID.Status = 'Exchanged';
       await request.BookID.save();
+      await createNotification(request.RequesterID, 'request_accepted', `Your request for "${request.BookID.Title}" was accepted!`, '/book-exchange');
     } else {
       request.Status = 'Rejected';
       request.BookID.Status = 'Available';
       await request.BookID.save();
+      await createNotification(request.RequesterID, 'request_declined', `Your request for "${request.BookID.Title}" was declined.`, '/book-exchange');
     }
     await request.save();
     res.json({ success: true, data: request });

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Search, Filter, Star, Eye, ChevronDown, ThumbsUp } from 'lucide-react';
+import { Search, Filter, Eye, ChevronDown, ThumbsUp } from 'lucide-react';
 import { apiFetch, fileUrl } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -185,30 +185,24 @@ export default function NotesRepository() {
             const pdfHref = fileUrl(note.FileURL);
             return (
               <div key={note._id} className="bg-white rounded-xl shadow-sm border border-parchment-200 overflow-hidden hover:shadow-md transition-shadow group flex flex-col">
-                <div className="p-5 flex-1">
-                  <div className="flex justify-between items-start mb-3">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-accent-primary">
+                {note.CoverImage ? (
+                  <div className="h-44 w-full overflow-hidden">
+                    <img src={fileUrl(note.CoverImage)} alt="cover" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  </div>
+                ) : null}
+                <div className="p-3 flex-1">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-accent-primary">
                       {note.Subject}
                     </span>
-                    <div className="flex items-center bg-amber-50 px-2 py-1 rounded text-amber-700 text-xs font-bold gap-1">
-                      <Star className="h-3 w-3 fill-current" />
-                      New
-                    </div>
+                    <span className="text-xs font-semibold text-slate-400">Sem {note.Semester}</span>
                   </div>
-                  <h3 className="text-lg font-bold text-ink-900 mb-2 line-clamp-2" title={note.Title}>
+                  <h3 className="text-sm font-bold text-ink-900 mb-1 line-clamp-2" title={note.Title}>
                     {note.Title}
                   </h3>
-                  <p className="text-sm text-ink-800 mb-4 flex items-center gap-2">
-                    <span className="font-medium text-ink-800">Semester</span> {note.Semester}
-                  </p>
-                  <div className="flex items-center justify-between text-xs text-ink-800 mt-auto">
-                    <div className="flex items-center gap-1">
-                      <span className="font-medium text-ink-800">By</span> {uploader}
-                    </div>
-                    <span>Sem {note.Semester}</span>
-                  </div>
+                  <p className="text-xs text-ink-800">By {uploader}</p>
                 </div>
-                <div className="bg-parchment-50 px-5 py-3 border-t border-parchment-200 mt-auto flex gap-2">
+                <div className="bg-parchment-50 px-3 py-2 border-t border-parchment-200 mt-auto flex gap-2">
                   <a
                     href={pdfHref}
                     target="_blank"

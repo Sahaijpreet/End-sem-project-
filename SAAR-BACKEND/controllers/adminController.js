@@ -57,3 +57,35 @@ export const listUsers = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+export const listAllNotes = async (req, res) => {
+  try {
+    const notes = await Note.find()
+      .populate('UploaderID', 'Name')
+      .sort('-createdAt');
+    res.status(200).json({ success: true, data: notes });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const listAllBooks = async (req, res) => {
+  try {
+    const books = await Book.find()
+      .populate('OwnerID', 'Name')
+      .sort('-createdAt');
+    res.status(200).json({ success: true, data: books });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const deleteBook = async (req, res) => {
+  try {
+    const book = await Book.findByIdAndDelete(req.params.id);
+    if (!book) return res.status(404).json({ success: false, message: 'Book not found' });
+    res.status(200).json({ success: true, message: 'Book deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

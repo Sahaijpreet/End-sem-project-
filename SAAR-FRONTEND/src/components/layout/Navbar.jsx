@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { BookOpen, UserCircle, Menu, Shield } from 'lucide-react';
+import { BookOpen, UserCircle, Menu, Shield, MessageCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export default function Navbar() {
@@ -18,6 +18,7 @@ export default function Navbar() {
         {/* Nav links - center */}
         <div className="hidden md:flex flex-1 items-center justify-center gap-2">
           <Link to="/notes" className="text-ink-800 hover:text-accent-primary hover:bg-indigo-50 hover:shadow-md hover:scale-105 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200">Notes</Link>
+          <Link to="/pyqs" className="text-ink-800 hover:text-accent-primary hover:bg-indigo-50 hover:shadow-md hover:scale-105 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200">PYQs</Link>
           <Link to="/book-exchange" className="text-ink-800 hover:text-accent-primary hover:bg-indigo-50 hover:shadow-md hover:scale-105 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200">Book Exchange</Link>
           <Link to="/ai-summary" className="text-ink-800 hover:text-accent-primary hover:bg-indigo-50 hover:shadow-md hover:scale-105 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center gap-1.5">
             <span className="inline-block w-2 h-2 rounded-full bg-accent-primary animate-pulse"></span>
@@ -49,6 +50,9 @@ export default function Navbar() {
               )}
               <Link to="/profile" className="text-ink-800 hover:text-accent-primary" title="Profile">
                 <UserCircle className="h-6 w-6" />
+              </Link>
+              <Link to="/inbox" className="text-ink-800 hover:text-accent-primary" title="Inbox">
+                <MessageCircle className="h-6 w-6" />
               </Link>
               <button
                 type="button"

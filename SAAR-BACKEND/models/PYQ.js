@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const NoteSchema = new mongoose.Schema({
+const PYQSchema = new mongoose.Schema({
   Title: {
     type: String,
     required: [true, 'Please add a title'],
@@ -14,31 +14,32 @@ const NoteSchema = new mongoose.Schema({
   Semester: {
     type: Number,
     required: [true, 'Please specify the semester (1-8)'],
-    min: [1, 'Semester cannot be less than 1'],
-    max: [8, 'Semester cannot be more than 8']
+    min: 1,
+    max: 8
+  },
+  Year: {
+    type: Number,
+    required: [true, 'Please specify the exam year']
+  },
+  ExamType: {
+    type: String,
+    enum: ['Mid Semester', 'End Semester', 'Quiz', 'Other'],
+    default: 'End Semester'
   },
   FileURL: {
     type: String,
-    required: [true, 'Please provide the file path']
-  },
-  UploadDate: {
-    type: Date,
-    default: Date.now
+    required: true
   },
   UploaderID: {
     type: mongoose.Schema.ObjectId,
     ref: 'User',
     required: true
   },
-  CoverImage: { type: String, default: '' },
   Likes: [{
     type: mongoose.Schema.ObjectId,
     ref: 'User'
   }]
-}, {
-  timestamps: true
-});
+}, { timestamps: true });
 
-const Note = mongoose.model('Note', NoteSchema);
-
-export default Note;
+const PYQ = mongoose.model('PYQ', PYQSchema);
+export default PYQ;

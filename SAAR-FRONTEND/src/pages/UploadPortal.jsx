@@ -1,17 +1,29 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UploadCloud, File, X, Info } from 'lucide-react';
+import { UploadCloud, File, X, Info, ImagePlus } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 
 export default function UploadPortal() {
   const [dragActive, setDragActive] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
+  const [coverImage, setCoverImage] = useState(null);
+  const [coverPreview, setCoverPreview] = useState('');
   const [title, setTitle] = useState('');
   const [subject, setSubject] = useState('');
   const [semester, setSemester] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+
+  function handleCoverChange(e) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(f.type)) {
+      setError('Cover must be JPG, PNG or WEBP.'); return;
+    }
+    setCoverImage(f);
+    setCoverPreview(URL.createObjectURL(f));
+  }
 
   const handleDrag = function (e) {
     e.preventDefault();
@@ -62,6 +74,7 @@ export default function UploadPortal() {
     try {
       const fd = new FormData();
       fd.append('document', uploadedFile);
+      if (coverImage) fd.append('cover', coverImage);
       fd.append('Title', title.trim());
       fd.append('Subject', subject);
       fd.append('Semester', semester);
@@ -149,6 +162,29 @@ export default function UploadPortal() {
                     </button>
                   </div>
                 )}
+              </div>
+
+              {/* Cover image */}
+              <div>
+                <label className="block text-sm font-semibold text-ink-900 mb-3">Cover Image <span className="text-slate-400 font-normal">(optional)</span></label>
+                <div className="flex items-center gap-4">
+                  {coverPreview ? (
+                    <div className="relative w-24 h-32 rounded-lg overflow-hidden border border-parchment-200 shadow-sm">
+                      <img src={coverPreview} alt="cover" className="w-full h-full object-cover" />
+                      <button type="button" onClick={() => { setCoverImage(null); setCoverPreview(''); }}
+                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="w-24 h-32 rounded-lg border-2 border-dashed border-parchment-300 hover:border-indigo-400 flex flex-col items-center justify-center cursor-pointer bg-parchment-50 hover:bg-parchment-100 transition-colors">
+                      <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleCoverChange} />
+                      <ImagePlus className="h-6 w-6 text-slate-400 mb-1" />
+                      <span className="text-xs text-slate-400">Add cover</span>
+                    </label>
+                  )}
+                  <p className="text-xs text-ink-800">JPG, PNG or WEBP · max 5MB<br />Recommended: portrait ratio (3:4)</p>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-parchment-200">

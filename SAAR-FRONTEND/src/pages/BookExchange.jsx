@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Search, Filter, BookOpen, MessageCircle, MapPin, CheckCircle, XCircle, Bell } from 'lucide-react';
-import { apiFetch } from '../lib/api';
+import { Search, Filter, BookOpen, MessageCircle, MapPin, CheckCircle, XCircle, Bell, ImagePlus, X } from 'lucide-react';
+import { apiFetch, fileUrl } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const PLACEHOLDER = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=400';
 
 export default function BookExchange() {
   const { isAuthenticated } = useAuth();
   const toast = useToast();
+  const navigate = useNavigate();
   const [tab, setTab] = useState('browse'); // 'browse' | 'requests'
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
@@ -21,6 +22,8 @@ export default function BookExchange() {
   const [listTitle, setListTitle] = useState('');
   const [listAuthor, setListAuthor] = useState('');
   const [listSubject, setListSubject] = useState('');
+  const [listCover, setListCover] = useState(null);
+  const [listCoverPreview, setListCoverPreview] = useState('');
   const [actionId, setActionId] = useState(null);
   const [myRequests, setMyRequests] = useState([]);
   const [reqLoading, setReqLoading] = useState(false);
@@ -72,10 +75,17 @@ export default function BookExchange() {
     try {
       await apiFetch('/api/books', {
         method: 'POST',
-        body: JSON.stringify({ Title: listTitle.trim(), Author: listAuthor.trim(), Subject: listSubject }),
+        body: (() => {
+          const fd = new FormData();
+          fd.append('Title', listTitle.trim());
+          fd.append('Author', listAuthor.trim());
+          fd.append('Subject', listSubject);
+          if (listCover) fd.append('cover', listCover);
+          return fd;
+        })(),
       });
       setListOpen(false);
-      setListTitle(''); setListAuthor(''); setListSubject('');
+      setListTitle(''); setListAuthor(''); setListSubject(''); setListCover(null); setListCoverPreview('');
       await loadBooks();
       toast('Book listed successfully!');
     } catch (err) {
@@ -102,8 +112,13 @@ export default function BookExchange() {
   async function respondRequest(reqId, action) {
     setActionId(reqId);
     try {
-      await apiFetch(`/api/books/respond/${reqId}`, { method: 'PATCH', body: JSON.stringify({ action }) });
+      const res = await apiFetch(`/api/books/respond/${reqId}`, { method: 'PATCH', body: JSON.stringify({ action }) });
       toast(action === 'accept' ? 'Request accepted!' : 'Request declined.');
+      if (action === 'accept') {
+        // Open chat after accepting
+        const chatRes = await apiFetch(`/api/chat/conversations/request/${reqId}`);
+        if (chatRes.success) navigate(`/chat/${chatRes.data._id}`);
+      }
       await Promise.all([loadBooks(), loadMyRequests()]);
     } catch (err) {
       toast(err.message || 'Action failed', 'error');
@@ -194,6 +209,18 @@ export default function BookExchange() {
                         </button>
                       </div>
                     )}
+                    {req.Status === 'Accepted' && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const res = await apiFetch(`/api/chat/conversations/request/${req._id}`);
+                          if (res.success) navigate(`/chat/${res.data._id}`);
+                        }}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-accent-primary border border-indigo-200 rounded-lg text-sm font-medium hover:bg-indigo-100"
+                      >
+                        <MessageCircle className="h-4 w-4" /> Chat
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -260,7 +287,7 @@ export default function BookExchange() {
             return (
               <div key={book._id} className="bg-white rounded-xl shadow-sm border border-parchment-200 overflow-hidden hover:shadow-lg transition-all group flex flex-col">
 
-                <div className="relative h-48 w-full bg-parchment-100 flex items-center justify-center overflow-hidden border-b border-parchment-200">
+                <div className="relative h-52 w-full bg-parchment-100 flex items-center justify-center overflow-hidden border-b border-parchment-200">
                   <div className="absolute top-3 right-3 z-10 flex gap-2">
                     <span
                       className={`px-2.5 py-1 text-xs font-bold rounded-full shadow-sm ${
@@ -271,13 +298,13 @@ export default function BookExchange() {
                     </span>
                   </div>
                   <img
-                    src={PLACEHOLDER}
+                    src={book.CoverImage ? fileUrl(book.CoverImage) : PLACEHOLDER}
                     alt=""
                     className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                 </div>
 
-                <div className="p-5 flex-1 flex flex-col">
+                <div className="p-3 flex-1 flex flex-col">
                   <p className="text-xs font-semibold text-accent-primary mb-1 tracking-wide uppercase">{book.Subject}</p>
                   <h3 className="text-lg font-bold text-ink-900 mb-1 line-clamp-2" title={book.Title}>{book.Title}</h3>
                   <p className="text-sm text-ink-800 mb-4">{book.Author}</p>
@@ -356,6 +383,30 @@ export default function BookExchange() {
                     <option value="Chemistry">Chemistry</option>
                     <option value="Biology">Biology</option>
                   </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-ink-800">Cover Image <span className="text-slate-400 text-xs">(optional)</span></label>
+                  <div className="mt-1 flex items-center gap-3">
+                    {listCoverPreview ? (
+                      <div className="relative w-16 h-20 rounded-lg overflow-hidden border border-parchment-200">
+                        <img src={listCoverPreview} alt="cover" className="w-full h-full object-cover" />
+                        <button type="button" onClick={() => { setListCover(null); setListCoverPreview(''); }}
+                          className="absolute top-0.5 right-0.5 bg-red-500 text-white rounded-full p-0.5">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="w-16 h-20 rounded-lg border-2 border-dashed border-parchment-300 hover:border-indigo-400 flex flex-col items-center justify-center cursor-pointer bg-parchment-50">
+                        <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) { setListCover(f); setListCoverPreview(URL.createObjectURL(f)); }
+                          }} />
+                        <ImagePlus className="h-5 w-5 text-slate-400" />
+                      </label>
+                    )}
+                    <p className="text-xs text-ink-800">JPG, PNG or WEBP</p>
+                  </div>
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
                   <button type="button" onClick={() => setListOpen(false)} className="px-4 py-2 border rounded-lg">Cancel</button>

@@ -23,7 +23,8 @@ const BookSchema = new mongoose.Schema({
     type: mongoose.Schema.ObjectId,
     ref: 'User',
     required: true
-  }
+  },
+  CoverImage: { type: String, default: '' }
 }, {
   timestamps: true
 });

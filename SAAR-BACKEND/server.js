@@ -11,6 +11,9 @@ import bookRoutes from './routes/bookRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import publicRoutes from './routes/publicRoutes.js';
+import pyqRoutes from './routes/pyqRoutes.js';
+import chatRoutes from './routes/chatRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -53,6 +56,9 @@ app.use('/api/notes', noteRoutes);
 app.use('/api/books', bookRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/pyqs', pyqRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Start Server
 app.listen(PORT, () => {

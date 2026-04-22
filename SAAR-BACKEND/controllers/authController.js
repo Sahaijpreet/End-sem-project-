@@ -67,8 +67,9 @@ export const loginUser = async (req, res) => {
   try {
     const { Email, Password } = req.body;
     const emailTrim = (Email || '').trim();
+    const escaped = emailTrim.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const user = await User.findOne({
-      Email: { $regex: new RegExp(`^${escapeRegex(emailTrim)}$`, 'i') },
+      Email: { $regex: new RegExp(`^${escaped}$`, 'i') },
     }).select('+PasswordHash');
 
     if (user && (await bcrypt.compare(Password, user.PasswordHash))) {
