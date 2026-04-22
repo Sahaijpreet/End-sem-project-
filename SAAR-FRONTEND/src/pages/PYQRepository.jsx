@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Filter, Eye, ThumbsUp, ChevronDown, BookMarked, UploadCloud, X, File } from 'lucide-react';
+import { Search, Filter, ThumbsUp, ChevronDown, BookMarked, UploadCloud, X, File, Download, Bookmark, BookmarkCheck, MessageSquare } from 'lucide-react';
 import { apiFetch, fileUrl } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useReveal } from '../hooks/useReveal';
+import StarRating from '../components/StarRating';
+import Comments from '../components/Comments';
 
 const SUBJECTS = ['Computer Science', 'Physics', 'Chemistry', 'Mathematics', 'Economics', 'History', 'Biology', 'Other'];
 const EXAM_TYPES = ['Mid Semester', 'End Semester', 'Quiz', 'Other'];
@@ -20,6 +23,8 @@ export default function PYQRepository() {
   const [filterSemesters, setFilterSemesters] = useState(new Set());
   const [filterExamTypes, setFilterExamTypes] = useState(new Set());
   const [likingId, setLikingId] = useState(null);
+  const [bookmarks, setBookmarks] = useState(new Set());
+  const [activeComment, setActiveComment] = useState(null);
 
   // Upload modal state
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -32,16 +37,21 @@ export default function PYQRepository() {
   const [examType, setExamType] = useState('End Semester');
   const [uploading, setUploading] = useState(false);
 
+  useReveal('.reveal, .reveal-left, .reveal-scale', [pyqs]);
+
   async function loadPYQs() {
     setLoading(true);
     try {
-      const res = await apiFetch('/api/pyqs', { skipAuth: true });
+      const fetches = [apiFetch('/api/pyqs', { skipAuth: true })];
+      if (isAuthenticated) fetches.push(apiFetch('/api/auth/bookmarks'));
+      const [res, bmRes] = await Promise.all(fetches);
       setPyqs(res.success && Array.isArray(res.data) ? res.data : []);
+      if (bmRes?.success) setBookmarks(new Set(bmRes.data.pyqs?.map((p) => p._id) || []));
     } catch { setPyqs([]); }
     finally { setLoading(false); }
   }
 
-  useEffect(() => { loadPYQs(); }, []);
+  useEffect(() => { loadPYQs(); }, [isAuthenticated]);
 
   const filtered = useMemo(() => {
     const q = searchTerm.toLowerCase();
@@ -67,12 +77,23 @@ export default function PYQRepository() {
     setLikingId(id);
     try {
       const res = await apiFetch(`/api/pyqs/${id}/like`, { method: 'POST', body: JSON.stringify({}) });
-      setPyqs((prev) => prev.map((p) =>
-        p._id === id ? { ...p, Likes: Array(res.data.likes).fill(null), _liked: res.data.liked } : p
-      ));
-      toast(res.data.liked ? 'Liked!' : 'Like removed.');
+      setPyqs((prev) => prev.map((p) => p._id === id ? { ...p, Likes: Array(res.data.likes).fill(null), _liked: res.data.liked } : p));
     } catch (e) { toast(e.message, 'error'); }
     finally { setLikingId(null); }
+  }
+
+  async function handleBookmark(id) {
+    if (!isAuthenticated) { toast('Log in to bookmark.', 'error'); return; }
+    try {
+      const res = await apiFetch(`/api/auth/bookmarks/PYQ/${id}`, { method: 'POST', body: JSON.stringify({}) });
+      setBookmarks((prev) => { const n = new Set(prev); res.data.bookmarked ? n.add(id) : n.delete(id); return n; });
+      toast(res.data.bookmarked ? 'Bookmarked!' : 'Bookmark removed.');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  function handleDownload(id, href) {
+    apiFetch(`/api/pyqs/${id}/download`, { method: 'POST', body: JSON.stringify({}) }).catch(() => {});
+    window.open(href, '_blank');
   }
 
   function handleDrag(e) {
@@ -211,11 +232,10 @@ export default function PYQRepository() {
           {!loading && filtered.length === 0 && (
             <p className="text-ink-800 col-span-full">No PYQs found. Be the first to upload one!</p>
           )}
-          {filtered.map((pyq) => {
-            const uploader = pyq.UploaderID?.Name || 'Student';
+          {filtered.map((pyq, idx) => {
             const pdfHref = fileUrl(pyq.FileURL);
             return (
-              <div key={pyq._id} className="bg-white rounded-xl shadow-sm border border-parchment-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col">
+              <div key={pyq._id} className={`reveal delay-${Math.min(idx * 100, 500)} card-hover bg-white rounded-xl shadow-sm border border-parchment-200 overflow-hidden flex flex-col`}>
                 <div className="p-5 flex-1">
                   <div className="flex justify-between items-start mb-3">
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-accent-primary">
@@ -235,26 +255,43 @@ export default function PYQRepository() {
                   </div>
                   <p className="text-xs text-ink-800 mt-3">By {uploader}</p>
                 </div>
-                <div className="bg-parchment-50 px-5 py-3 border-t border-parchment-200 flex gap-2">
-                  <a
-                    href={pdfHref}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex-1 flex items-center justify-center gap-2 py-2 px-4 text-sm font-medium rounded-lg text-white bg-accent-primary hover:bg-accent-hover transition-colors"
-                  >
-                    <Eye className="h-4 w-4" /> Open PDF
-                  </a>
-                  <button
-                    type="button"
-                    disabled={likingId === pyq._id}
-                    onClick={() => handleLike(pyq._id)}
+                <div className="px-5 py-3">
+                  <StarRating resourceType="PYQ" resourceId={pyq._id} />
+                  <div className="flex gap-3 mt-1 text-xs text-ink-800">
+                    <span>{pyq.Downloads ?? 0} downloads</span>
+                    <span>{pyq.Likes?.length ?? 0} likes</span>
+                  </div>
+                </div>
+                <div className="bg-parchment-50 px-5 py-3 border-t border-parchment-200 flex gap-1.5 flex-wrap">
+                  <button onClick={() => handleDownload(pyq._id, fileUrl(pyq.FileURL))}
+                    className="flex-1 flex items-center justify-center gap-2 py-2 px-4 text-sm font-medium rounded-lg text-white bg-accent-primary hover:bg-accent-hover transition-colors">
+                    <Download className="h-4 w-4" /> Open
+                  </button>
+                  <button type="button" disabled={likingId === pyq._id} onClick={() => handleLike(pyq._id)}
                     className={`flex items-center justify-center gap-1 py-2 px-3 border rounded-lg text-sm font-medium transition-colors ${
                       pyq._liked ? 'bg-indigo-100 border-indigo-300 text-accent-primary' : 'border-parchment-300 text-ink-800 bg-white hover:bg-parchment-50'
-                    }`}
-                  >
-                    <ThumbsUp className="h-4 w-4" /> {pyq.Likes?.length ?? 0}
+                    }`}>
+                    <ThumbsUp className="h-4 w-4" />
+                  </button>
+                  <button type="button" onClick={() => handleBookmark(pyq._id)}
+                    className={`flex items-center justify-center py-2 px-3 border rounded-lg text-sm transition-colors ${
+                      bookmarks.has(pyq._id) ? 'bg-violet-100 border-violet-300 text-violet-600' : 'border-parchment-300 text-ink-800 bg-white hover:bg-parchment-50'
+                    }`}>
+                    {bookmarks.has(pyq._id) ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
+                  </button>
+                  <button type="button" onClick={() => setActiveComment(activeComment === pyq._id ? null : pyq._id)}
+                    className="flex items-center justify-center py-2 px-3 border border-parchment-300 rounded-lg text-sm text-ink-800 bg-white hover:bg-parchment-50">
+                    <MessageSquare className="h-4 w-4" />
                   </button>
                 </div>
+                {activeComment === pyq._id && (
+                  <div className="px-4 pb-4 border-t border-parchment-100">
+                    <div className="flex justify-end pt-2">
+                      <button onClick={() => setActiveComment(null)} className="text-slate-400 hover:text-ink-900"><X className="h-4 w-4" /></button>
+                    </div>
+                    <Comments resourceType="PYQ" resourceId={pyq._id} />
+                  </div>
+                )}
               </div>
             );
           })}

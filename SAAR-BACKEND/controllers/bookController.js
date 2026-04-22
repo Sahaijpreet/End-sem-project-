@@ -1,6 +1,8 @@
 import Book from '../models/Book.js';
 import ExchangeRequest from '../models/ExchangeRequest.js';
+import User from '../models/User.js';
 import { createNotification } from './notificationController.js';
+import { sendEmail, bookRequestEmail, requestAcceptedEmail } from '../utils/email.js';
 
 export const listBook = async (req, res) => {
   try {
@@ -66,8 +68,9 @@ export const requestExchange = async (req, res) => {
     // Update book status
     book.Status = 'Requested';
     await book.save();
-    // Notify owner
     await createNotification(book.OwnerID, 'book_requested', `${req.user.Name || 'Someone'} requested your book "${book.Title}"`, '/book-exchange');
+    const owner = await User.findById(book.OwnerID).select('Email Name');
+    if (owner) await sendEmail(bookRequestEmail(owner.Email, owner.Name, req.user.Name, book.Title));
     res.status(201).json({ success: true, data: exchangeRequest });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -101,6 +104,8 @@ export const respondToRequest = async (req, res) => {
       request.BookID.Status = 'Exchanged';
       await request.BookID.save();
       await createNotification(request.RequesterID, 'request_accepted', `Your request for "${request.BookID.Title}" was accepted!`, '/book-exchange');
+      const requester = await User.findById(request.RequesterID).select('Email Name');
+      if (requester) await sendEmail(requestAcceptedEmail(requester.Email, requester.Name, request.BookID.Title));
     } else {
       request.Status = 'Rejected';
       request.BookID.Status = 'Available';

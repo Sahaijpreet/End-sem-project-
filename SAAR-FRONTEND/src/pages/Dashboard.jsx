@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { FileText, BookOpen, Sparkles, BookMarked, Shield } from 'lucide-react';
+import { FileText, BookOpen, BookMarked, Shield, Download, Bookmark, Trophy } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useReveal } from '../hooks/useReveal';
 
 export default function Dashboard() {
   const { user, isAdmin } = useAuth();
@@ -11,6 +12,7 @@ export default function Dashboard() {
   const notice = location.state?.notice;
   const [notes, setNotes] = useState([]);
   const [books, setBooks] = useState([]);
+  const [bookmarks, setBookmarks] = useState({ notes: [], pyqs: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,21 +20,16 @@ export default function Dashboard() {
     Promise.all([
       apiFetch('/api/notes', { skipAuth: true }),
       apiFetch('/api/books', { skipAuth: true }),
+      apiFetch('/api/auth/bookmarks'),
     ])
-      .then(([nRes, bRes]) => {
+      .then(([nRes, bRes, bmRes]) => {
         if (cancelled) return;
         setNotes(nRes.success && Array.isArray(nRes.data) ? nRes.data : []);
         setBooks(bRes.success && Array.isArray(bRes.data) ? bRes.data : []);
+        setBookmarks(bmRes.success ? bmRes.data : { notes: [], pyqs: [] });
       })
-      .catch(() => {
-        if (!cancelled) {
-          setNotes([]);
-          setBooks([]);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+      .catch(() => { if (!cancelled) { setNotes([]); setBooks([]); } })
+      .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
 
@@ -56,6 +53,8 @@ export default function Dashboard() {
     });
   }, [books, user]);
 
+  useReveal();
+
   return (
     <div className="flex-1 bg-parchment-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -73,7 +72,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="mb-8">
+        <div className="mb-8 animate-fade-up">
           <h1 className="text-3xl font-bold text-ink-900">Student Dashboard</h1>
           <p className="text-ink-800 mt-2">
             Welcome back{user?.Name ? `, ${user.Name}` : ''}. Here is a snapshot of your activity on SAAR.
@@ -90,14 +89,14 @@ export default function Dashboard() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 reveal">
           <div className="bg-white rounded-xl shadow-sm border border-parchment-200 p-6 flex items-center">
             <div className="bg-indigo-100 text-accent-primary p-4 rounded-lg mr-4">
               <FileText className="h-6 w-6" />
             </div>
             <div>
               <div className="text-2xl font-bold text-ink-900">{loading ? '…' : myNotes.length}</div>
-              <div className="text-sm text-ink-800 font-medium">Notes you uploaded</div>
+              <div className="text-sm text-ink-800 font-medium">Notes uploaded</div>
             </div>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-parchment-200 p-6 flex items-center">
@@ -106,23 +105,30 @@ export default function Dashboard() {
             </div>
             <div>
               <div className="text-2xl font-bold text-ink-900">{loading ? '…' : myListedBooks.length}</div>
-              <div className="text-sm text-ink-800 font-medium">Books you listed</div>
+              <div className="text-sm text-ink-800 font-medium">Books listed</div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-parchment-200 p-6 flex items-center">
+            <div className="bg-violet-100 text-violet-600 p-4 rounded-lg mr-4">
+              <Bookmark className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-ink-900">{loading ? '…' : (bookmarks.notes?.length || 0) + (bookmarks.pyqs?.length || 0)}</div>
+              <div className="text-sm text-ink-800 font-medium">Bookmarks</div>
             </div>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-parchment-200 p-6 flex items-center">
             <div className="bg-emerald-100 text-emerald-600 p-4 rounded-lg mr-4">
-              <Sparkles className="h-6 w-6" />
+              <Download className="h-6 w-6" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-ink-900">AI</div>
-              <div className="text-sm text-ink-800 font-medium">
-                <Link to="/ai-summary" className="text-accent-primary hover:underline">Open AI summary</Link>
-              </div>
+              <div className="text-2xl font-bold text-ink-900">{loading ? '…' : myNotes.reduce((s, n) => s + (n.Downloads || 0), 0)}</div>
+              <div className="text-sm text-ink-800 font-medium">Total downloads</div>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 reveal">
           <div className="bg-white rounded-xl shadow-sm border border-parchment-200 overflow-hidden">
             <div className="px-6 py-5 border-b border-parchment-200 flex justify-between items-center">
               <h2 className="text-lg font-bold text-ink-900 flex items-center gap-2">

@@ -15,9 +15,7 @@ export function AuthProvider({ children }) {
       method: 'POST',
       body: JSON.stringify({ Email, Password }),
     });
-    if (!res.success || !res.data?.token) {
-      throw new Error(res.message || 'Login failed');
-    }
+    if (!res.success || !res.data?.token) throw new Error(res.message || 'Login failed');
     const next = {
       token: res.data.token,
       user: {
@@ -25,6 +23,11 @@ export function AuthProvider({ children }) {
         Name: res.data.Name,
         Email: res.data.Email,
         Role: res.data.Role,
+        Avatar: res.data.Avatar || '',
+        Bio: res.data.Bio || '',
+        Branch: res.data.Branch || '',
+        Year: res.data.Year || null,
+        CollegeID: res.data.CollegeID || '',
       },
     };
     saveAuth(next);
@@ -38,9 +41,7 @@ export function AuthProvider({ children }) {
       method: 'POST',
       body: JSON.stringify(payload),
     });
-    if (!res.success || !res.data?.token) {
-      throw new Error(res.message || 'Registration failed');
-    }
+    if (!res.success || !res.data?.token) throw new Error(res.message || 'Registration failed');
     const next = {
       token: res.data.token,
       user: {
@@ -48,11 +49,25 @@ export function AuthProvider({ children }) {
         Name: res.data.Name,
         Email: res.data.Email,
         Role: res.data.Role,
+        Avatar: res.data.Avatar || '',
+        Bio: res.data.Bio || '',
+        Branch: res.data.Branch || '',
+        Year: res.data.Year || null,
+        CollegeID: res.data.CollegeID || '',
       },
     };
     saveAuth(next);
     setAuth(next);
     return next.user;
+  }, []);
+
+  const updateUser = useCallback((updatedUser) => {
+    setAuth((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, user: { ...prev.user, ...updatedUser } };
+      saveAuth(next);
+      return next;
+    });
   }, []);
 
   const logout = useCallback(() => {
@@ -69,8 +84,9 @@ export function AuthProvider({ children }) {
       login,
       register,
       logout,
+      updateUser,
     }),
-    [user, token, login, register, logout]
+    [user, token, login, register, logout, updateUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -78,8 +94,6 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 }

@@ -46,3 +46,12 @@ export const togglePYQLike = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+export const trackPYQDownload = async (req, res) => {
+  try {
+    await PYQ.findByIdAndUpdate(req.params.id, { $inc: { Downloads: 1 } });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

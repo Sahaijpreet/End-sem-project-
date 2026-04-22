@@ -31,10 +31,8 @@ const NoteSchema = new mongoose.Schema({
     required: true
   },
   CoverImage: { type: String, default: '' },
-  Likes: [{
-    type: mongoose.Schema.ObjectId,
-    ref: 'User'
-  }]
+  Likes: [{ type: mongoose.Schema.ObjectId, ref: 'User' }],
+  Downloads: { type: Number, default: 0 },
 }, {
   timestamps: true
 });

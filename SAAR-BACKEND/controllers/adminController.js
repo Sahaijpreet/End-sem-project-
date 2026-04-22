@@ -1,29 +1,19 @@
 import User from '../models/User.js';
 import Note from '../models/Note.js';
 import Book from '../models/Book.js';
+import PYQ from '../models/PYQ.js';
 import ExchangeRequest from '../models/ExchangeRequest.js';
 
-// Get high-level platform stats
 export const getStats = async (req, res) => {
   try {
-    const totalUsers = await User.countDocuments({});
-    const totalNotes = await Note.countDocuments({});
-    const totalBooks = await Book.countDocuments({});
-
-    const latestNotes = await Note.find()
-      .populate('UploaderID', 'Name')
-      .sort('-UploadDate')
-      .limit(5);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        totalUsers,
-        totalNotes,
-        totalBooks,
-        latestNotes
-      }
-    });
+    const [totalUsers, totalNotes, totalBooks, totalPYQs, latestNotes] = await Promise.all([
+      User.countDocuments({}),
+      Note.countDocuments({}),
+      Book.countDocuments({}),
+      PYQ.countDocuments({}),
+      Note.find().populate('UploaderID', 'Name').sort('-UploadDate').limit(5),
+    ]);
+    res.status(200).json({ success: true, data: { totalUsers, totalNotes, totalBooks, totalPYQs, latestNotes } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -85,6 +75,35 @@ export const deleteBook = async (req, res) => {
     const book = await Book.findByIdAndDelete(req.params.id);
     if (!book) return res.status(404).json({ success: false, message: 'Book not found' });
     res.status(200).json({ success: true, message: 'Book deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const listAllPYQs = async (req, res) => {
+  try {
+    const pyqs = await PYQ.find().populate('UploaderID', 'Name').sort('-createdAt');
+    res.status(200).json({ success: true, data: pyqs });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const deletePYQ = async (req, res) => {
+  try {
+    const pyq = await PYQ.findByIdAndDelete(req.params.id);
+    if (!pyq) return res.status(404).json({ success: false, message: 'PYQ not found' });
+    res.status(200).json({ success: true, message: 'PYQ deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const deleteUser = async (req, res) => {
+  try {
+    const user = await User.findByIdAndDelete(req.params.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    res.status(200).json({ success: true, message: 'User deleted successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

@@ -50,14 +50,31 @@ export const toggleLike = async (req, res) => {
 
 export const getNoteById = async (req, res) => {
   try {
-    const note = await Note.findById(req.params.id)
-      .populate('UploaderID', 'Name CollegeID');
-      
-    if (!note) {
-      return res.status(404).json({ success: false, message: 'Note not found' });
-    }
-    
+    const note = await Note.findById(req.params.id).populate('UploaderID', 'Name CollegeID');
+    if (!note) return res.status(404).json({ success: false, message: 'Note not found' });
     res.status(200).json({ success: true, data: note });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const trackDownload = async (req, res) => {
+  try {
+    await Note.findByIdAndUpdate(req.params.id, { $inc: { Downloads: 1 } });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const deleteNote = async (req, res) => {
+  try {
+    const note = await Note.findById(req.params.id);
+    if (!note) return res.status(404).json({ success: false, message: 'Note not found' });
+    const isOwner = note.UploaderID.toString() === req.user._id.toString();
+    if (!isOwner && req.user.Role !== 'Admin') return res.status(403).json({ success: false, message: 'Not authorized' });
+    await note.deleteOne();
+    res.json({ success: true });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
