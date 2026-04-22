@@ -42,6 +42,21 @@ export const getNotes = async (req, res) => {
   }
 };
 
+export const toggleLike = async (req, res) => {
+  try {
+    const note = await Note.findById(req.params.id);
+    if (!note) return res.status(404).json({ success: false, message: 'Note not found' });
+    const uid = req.user._id.toString();
+    const idx = note.Likes.findIndex((l) => l.toString() === uid);
+    if (idx === -1) note.Likes.push(req.user._id);
+    else note.Likes.splice(idx, 1);
+    await note.save();
+    res.json({ success: true, data: { likes: note.Likes.length, liked: idx === -1 } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 export const getNoteById = async (req, res) => {
   try {
     const note = await Note.findById(req.params.id)

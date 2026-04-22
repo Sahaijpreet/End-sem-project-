@@ -18,6 +18,39 @@ const getGemini = () => {
   };
 };
 
+export const summarizeUpload = async (req, res) => {
+  try {
+    const clients = getGemini();
+    if (!clients) {
+      return res.status(503).json({ success: false, message: 'AI summarization is not configured. Set GEMINI_API_KEY on the server.' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No PDF file uploaded.' });
+    }
+    const { genAI, fileManager } = clients;
+    const filePath = req.file.path;
+    const uploadResult = await fileManager.uploadFile(filePath, {
+      mimeType: 'application/pdf',
+      displayName: req.file.originalname,
+    });
+    // Clean up temp file after upload
+    fs.unlink(filePath, () => {});
+    const prompt = 'Act as an expert university tutor. Extract the core concepts, key formulas, and an executive summary from this document. Format the response clearly.';
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+    const response = await model.generateContent([
+      { fileData: { mimeType: uploadResult.file.mimeType, fileUri: uploadResult.file.uri } },
+      { text: prompt },
+    ]);
+    res.status(200).json({
+      success: true,
+      data: { noteTitle: req.file.originalname, summaryText: response.response.text() },
+    });
+  } catch (error) {
+    console.error('AI Upload Summarization Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 export const summarizeNote = async (req, res) => {
   try {
     const clients = getGemini();
@@ -56,7 +89,7 @@ export const summarizeNote = async (req, res) => {
     const prompt = 'Act as an expert university tutor. Extract the core concepts, key formulas, and an executive summary from this document. Format the response clearly.';
     
     // Get the generative model
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
 
     // Generate content using the file URI and the prompt
     const response = await model.generateContent([

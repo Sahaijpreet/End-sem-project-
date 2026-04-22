@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Search, Filter, Star, Eye, ChevronDown } from 'lucide-react';
+import { Search, Filter, Star, Eye, ChevronDown, ThumbsUp } from 'lucide-react';
 import { apiFetch, fileUrl } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 const SUBJECTS = ['Computer Science', 'Physics', 'Chemistry', 'Mathematics', 'Economics', 'History', 'Biology', 'Other'];
 
 export default function NotesRepository() {
+  const { isAuthenticated, user } = useAuth();
+  const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialQ = searchParams.get('q') || '';
   const [searchTerm, setSearchTerm] = useState(initialQ);
@@ -14,6 +18,7 @@ export default function NotesRepository() {
   const [error, setError] = useState('');
   const [filterSubjects, setFilterSubjects] = useState(new Set());
   const [filterSemesters, setFilterSemesters] = useState(new Set());
+  const [likingId, setLikingId] = useState(null);
 
   useEffect(() => {
     setSearchTerm(initialQ);
@@ -70,6 +75,22 @@ export default function NotesRepository() {
       else next.add(sem);
       return next;
     });
+  }
+
+  async function handleLike(noteId) {
+    if (!isAuthenticated) { toast('Log in to like notes.', 'error'); return; }
+    setLikingId(noteId);
+    try {
+      const res = await apiFetch(`/api/notes/${noteId}/like`, { method: 'POST', body: JSON.stringify({}) });
+      setNotes((prev) => prev.map((n) =>
+        n._id === noteId ? { ...n, Likes: Array(res.data.likes).fill(null), _liked: res.data.liked } : n
+      ));
+      toast(res.data.liked ? 'Note liked!' : 'Like removed.');
+    } catch (e) {
+      toast(e.message || 'Failed to like note.', 'error');
+    } finally {
+      setLikingId(null);
+    }
   }
 
   return (
@@ -204,6 +225,17 @@ export default function NotesRepository() {
                   >
                     AI
                   </Link>
+                  <button
+                    type="button"
+                    disabled={likingId === note._id}
+                    onClick={() => handleLike(note._id)}
+                    className={`flex items-center justify-center gap-1 py-2 px-3 border rounded-lg text-sm font-medium transition-colors ${
+                      note._liked ? 'bg-indigo-100 border-indigo-300 text-accent-primary' : 'border-parchment-300 text-ink-800 bg-white hover:bg-parchment-50'
+                    }`}
+                  >
+                    <ThumbsUp className="h-4 w-4" />
+                    {note.Likes?.length ?? 0}
+                  </button>
                 </div>
               </div>
             );

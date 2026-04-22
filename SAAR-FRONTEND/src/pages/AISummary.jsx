@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useLocation } from 'react-router-dom';
-import { FileText, Download, Sparkles, Search } from 'lucide-react';
+import { FileText, Download, Sparkles, X } from 'lucide-react';
 import { apiFetch, fileUrl } from '../lib/api';
+import { jsPDF } from 'jspdf';
 
 export default function AISummary() {
   const location = useLocation();
@@ -85,19 +86,53 @@ export default function AISummary() {
             <FileText className="h-5 w-5 text-accent-primary shrink-0" />
             <span className="truncate max-w-[200px] text-white">{selected?.Title || 'Select a note'}</span>
           </div>
-          {pdfSrc && (
-            <a href={pdfSrc} target="_blank" rel="noreferrer" className="text-accent-primary hover:text-white text-xs">
-              Open in new tab
-            </a>
-          )}
+          <div className="flex items-center gap-3">
+            {pdfSrc && (
+              <a href={pdfSrc} target="_blank" rel="noreferrer" className="text-accent-primary hover:text-white text-xs">
+                Open in new tab
+              </a>
+            )}
+            {selectedId && (
+              <button
+                type="button"
+                onClick={() => { setSelectedId(''); setSummaryText(''); setError(''); }}
+                className="bg-red-500 hover:bg-red-600 text-white rounded-md p-1 transition-colors"
+                title="Close PDF"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex-1 min-h-[400px] bg-parchment-200">
           {pdfSrc ? (
             <iframe title="PDF" src={pdfSrc} className="w-full h-full min-h-[400px] border-0 bg-white" />
           ) : (
-            <div className="flex items-center justify-center h-full text-ink-800 p-8 text-center">
-              {loadingList ? 'Loading notes…' : 'Choose a note from the list to preview the PDF.'}
+            <div className="flex flex-col items-center justify-center h-full p-8 overflow-y-auto">
+              {loadingList ? (
+                <p className="text-ink-800">Loading notes…</p>
+              ) : (
+                <div className="w-full max-w-md">
+                  <p className="text-ink-900 font-semibold text-lg mb-4 text-center">Choose a note to preview</p>
+                  <div className="flex flex-col gap-3">
+                    {notes.map((n) => (
+                      <button
+                        key={n._id}
+                        type="button"
+                        onClick={() => setSelectedId(n._id)}
+                        className="w-full text-left bg-white border border-parchment-200 rounded-xl px-5 py-4 hover:border-accent-primary hover:shadow-md transition-all group"
+                      >
+                        <p className="font-semibold text-ink-900 group-hover:text-accent-primary truncate">{n.Title}</p>
+                        <p className="text-sm text-ink-800 mt-1">{n.Subject} · Semester {n.Semester}</p>
+                      </button>
+                    ))}
+                    {notes.length === 0 && (
+                      <p className="text-center text-ink-800 text-sm">No notes available yet.</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -109,20 +144,6 @@ export default function AISummary() {
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-accent-primary" />
             <h2 className="text-lg font-bold text-ink-900">SAAR AI Summary</h2>
-          </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <select
-              value={selectedId}
-              onChange={(e) => setSelectedId(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 border border-parchment-300 rounded-lg text-sm bg-white"
-              disabled={loadingList || notes.length === 0}
-            >
-              <option value="">Select a note…</option>
-              {notes.map((n) => (
-                <option key={n._id} value={n._id}>{n.Title}</option>
-              ))}
-            </select>
           </div>
         </div>
 
@@ -153,7 +174,7 @@ export default function AISummary() {
           )}
         </div>
 
-        <div className="p-4 bg-white border-t border-parchment-200">
+        <div className="p-4 bg-white border-t border-parchment-200 space-y-2">
           <button
             type="button"
             onClick={handleGenerate}
@@ -164,19 +185,39 @@ export default function AISummary() {
             {summaryText ? 'Regenerate summary' : 'Generate AI summary'}
           </button>
           {summaryText && (
-            <button
-              type="button"
-              onClick={() => {
-                const blob = new Blob([summaryText], { type: 'text/plain' });
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = `${noteTitle || 'summary'}.txt`;
-                a.click();
-              }}
-              className="mt-3 w-full flex justify-center items-center gap-2 py-2 text-sm text-accent-primary border border-indigo-200 rounded-lg"
-            >
-              <Download className="h-4 w-4" /> Download as text
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const blob = new Blob([summaryText], { type: 'text/plain' });
+                  const a = document.createElement('a');
+                  a.href = URL.createObjectURL(blob);
+                  a.download = `${noteTitle || 'summary'}.txt`;
+                  a.click();
+                }}
+                className="flex-1 flex justify-center items-center gap-2 py-2 text-sm text-accent-primary border border-indigo-200 rounded-lg hover:bg-indigo-50"
+              >
+                <Download className="h-4 w-4" /> Download TXT
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const doc = new jsPDF();
+                  const title = noteTitle || 'Summary';
+                  doc.setFontSize(16);
+                  doc.setFont('helvetica', 'bold');
+                  doc.text(title, 15, 20);
+                  doc.setFontSize(11);
+                  doc.setFont('helvetica', 'normal');
+                  const lines = doc.splitTextToSize(summaryText.replace(/[#*`]/g, ''), 180);
+                  doc.text(lines, 15, 32);
+                  doc.save(`${title}.pdf`);
+                }}
+                className="flex-1 flex justify-center items-center gap-2 py-2 text-sm text-accent-primary border border-indigo-200 rounded-lg hover:bg-indigo-50"
+              >
+                <FileText className="h-4 w-4" /> Download PDF
+              </button>
+            </div>
           )}
         </div>
       </div>

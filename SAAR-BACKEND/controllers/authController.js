@@ -48,7 +48,20 @@ export const registerUser = async (req, res) => {
   }
 };
 
-const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+export const updateProfile = async (req, res) => {
+  try {
+    const { Name, CollegeID } = req.body;
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { ...(Name && { Name }), ...(CollegeID !== undefined && { CollegeID }) },
+      { new: true, runValidators: true }
+    ).select('-PasswordHash');
+    res.json({ success: true, data: user });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 
 export const loginUser = async (req, res) => {
   try {

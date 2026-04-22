@@ -29,7 +29,11 @@ const NoteSchema = new mongoose.Schema({
     type: mongoose.Schema.ObjectId,
     ref: 'User',
     required: true
-  }
+  },
+  Likes: [{
+    type: mongoose.Schema.ObjectId,
+    ref: 'User'
+  }]
 }, {
   timestamps: true
 });

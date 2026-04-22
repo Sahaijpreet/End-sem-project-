@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Search, Filter, BookOpen, MessageCircle, MapPin } from 'lucide-react';
+import { Search, Filter, BookOpen, MessageCircle, MapPin, CheckCircle, XCircle, Bell } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { Link } from 'react-router-dom';
 
 const PLACEHOLDER = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=400';
 
 export default function BookExchange() {
   const { isAuthenticated } = useAuth();
+  const toast = useToast();
+  const [tab, setTab] = useState('browse'); // 'browse' | 'requests'
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [subjectFilter, setSubjectFilter] = useState('');
@@ -19,6 +22,8 @@ export default function BookExchange() {
   const [listAuthor, setListAuthor] = useState('');
   const [listSubject, setListSubject] = useState('');
   const [actionId, setActionId] = useState(null);
+  const [myRequests, setMyRequests] = useState([]);
+  const [reqLoading, setReqLoading] = useState(false);
 
   async function loadBooks() {
     setLoading(true);
@@ -40,6 +45,18 @@ export default function BookExchange() {
     loadBooks();
   }, [subjectFilter]);
 
+  async function loadMyRequests() {
+    if (!isAuthenticated) return;
+    setReqLoading(true);
+    try {
+      const res = await apiFetch('/api/books/my-requests');
+      if (res.success) setMyRequests(res.data);
+    } catch {}
+    finally { setReqLoading(false); }
+  }
+
+  useEffect(() => { loadMyRequests(); }, [isAuthenticated]);
+
   const filteredBooks = books.filter((book) => {
     const matchesSearch =
       book.Title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -55,35 +72,41 @@ export default function BookExchange() {
     try {
       await apiFetch('/api/books', {
         method: 'POST',
-        body: JSON.stringify({
-          Title: listTitle.trim(),
-          Author: listAuthor.trim(),
-          Subject: listSubject,
-        }),
+        body: JSON.stringify({ Title: listTitle.trim(), Author: listAuthor.trim(), Subject: listSubject }),
       });
       setListOpen(false);
-      setListTitle('');
-      setListAuthor('');
-      setListSubject('');
+      setListTitle(''); setListAuthor(''); setListSubject('');
       await loadBooks();
+      toast('Book listed successfully!');
     } catch (err) {
-      setError(err.message || 'Could not list book');
+      toast(err.message || 'Could not list book', 'error');
     } finally {
       setActionId(null);
     }
   }
 
   async function requestBook(id) {
-    if (!isAuthenticated) {
-      setError('Log in to request a book.');
-      return;
-    }
+    if (!isAuthenticated) { toast('Log in to request a book.', 'error'); return; }
     setActionId(id);
     try {
       await apiFetch(`/api/books/request/${id}`, { method: 'POST', body: JSON.stringify({}) });
       await loadBooks();
+      toast('Exchange request sent!');
     } catch (err) {
-      setError(err.message || 'Request failed');
+      toast(err.message || 'Request failed', 'error');
+    } finally {
+      setActionId(null);
+    }
+  }
+
+  async function respondRequest(reqId, action) {
+    setActionId(reqId);
+    try {
+      await apiFetch(`/api/books/respond/${reqId}`, { method: 'PATCH', body: JSON.stringify({ action }) });
+      toast(action === 'accept' ? 'Request accepted!' : 'Request declined.');
+      await Promise.all([loadBooks(), loadMyRequests()]);
+    } catch (err) {
+      toast(err.message || 'Action failed', 'error');
     } finally {
       setActionId(null);
     }
@@ -99,24 +122,81 @@ export default function BookExchange() {
               <BookOpen className="h-8 w-8 text-accent-primary" />
               Book Exchange Marketplace
             </h1>
-            <p className="text-ink-800 mt-2 max-w-2xl">
-              List books you own or request an exchange when a copy is available.
-            </p>
+            <p className="text-ink-800 mt-2 max-w-2xl">List books you own or request an exchange when a copy is available.</p>
           </div>
-          <button
-            type="button"
-            onClick={() => (isAuthenticated ? setListOpen(true) : setError('Log in to list a book.'))}
-            className="bg-accent-primary text-white px-6 py-2.5 rounded-lg shadow-sm font-medium hover:bg-accent-hover transition-colors whitespace-nowrap"
-          >
-            + List a Book
-          </button>
+          <div className="flex gap-2">
+            {isAuthenticated && (
+              <button
+                type="button"
+                onClick={() => { setTab(tab === 'requests' ? 'browse' : 'requests'); loadMyRequests(); }}
+                className="flex items-center gap-2 border border-parchment-300 bg-white text-ink-800 px-4 py-2.5 rounded-lg font-medium hover:bg-parchment-50 transition-colors"
+              >
+                <Bell className="h-4 w-4" />
+                Requests {myRequests.length > 0 && <span className="bg-accent-primary text-white text-xs rounded-full px-1.5">{myRequests.filter(r => r.Status === 'Pending').length}</span>}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => (isAuthenticated ? setListOpen(true) : toast('Log in to list a book.', 'error'))}
+              className="bg-accent-primary text-white px-6 py-2.5 rounded-lg shadow-sm font-medium hover:bg-accent-hover transition-colors whitespace-nowrap"
+            >
+              + List a Book
+            </button>
+          </div>
         </div>
 
         {error && (
           <div className="mb-4 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-sm flex justify-between gap-4">
             <span>{error}</span>
-            {!isAuthenticated && (
-              <Link to="/auth" className="font-medium text-accent-primary shrink-0">Log in</Link>
+            {!isAuthenticated && <Link to="/auth" className="font-medium text-accent-primary shrink-0">Log in</Link>}
+          </div>
+        )}
+
+        {tab === 'requests' && (
+          <div className="bg-white rounded-xl shadow-sm border border-parchment-200 mb-8 overflow-hidden">
+            <div className="p-5 border-b border-parchment-200 bg-parchment-50 flex justify-between items-center">
+              <h2 className="font-bold text-ink-900">Incoming exchange requests on your books</h2>
+              <button type="button" onClick={() => setTab('browse')} className="text-sm text-accent-primary">Back to browse</button>
+            </div>
+            {reqLoading ? (
+              <p className="p-6 text-ink-800 text-sm">Loading…</p>
+            ) : myRequests.length === 0 ? (
+              <p className="p-6 text-ink-800 text-sm">No requests yet.</p>
+            ) : (
+              <div className="divide-y divide-parchment-200">
+                {myRequests.map((req) => (
+                  <div key={req._id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <p className="font-semibold text-ink-900">{req.BookID?.Title}</p>
+                      <p className="text-sm text-ink-800">Requested by <span className="font-medium">{req.RequesterID?.Name}</span> · {req.RequesterID?.Email}</p>
+                      <span className={`inline-block mt-1 px-2 py-0.5 text-xs font-semibold rounded-full ${
+                        req.Status === 'Pending' ? 'bg-amber-100 text-amber-800' :
+                        req.Status === 'Accepted' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                      }`}>{req.Status}</span>
+                    </div>
+                    {req.Status === 'Pending' && (
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={actionId === req._id}
+                          onClick={() => respondRequest(req._id, 'accept')}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-sm font-medium hover:bg-emerald-100 disabled:opacity-50"
+                        >
+                          <CheckCircle className="h-4 w-4" /> Accept
+                        </button>
+                        <button
+                          type="button"
+                          disabled={actionId === req._id}
+                          onClick={() => respondRequest(req._id, 'reject')}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-sm font-medium hover:bg-rose-100 disabled:opacity-50"
+                        >
+                          <XCircle className="h-4 w-4" /> Decline
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}
