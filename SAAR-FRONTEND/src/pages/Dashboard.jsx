@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { FileText, BookOpen, BookMarked, Shield, Download, Bookmark, Trophy } from 'lucide-react';
+import { FileText, BookOpen, BookMarked, Shield, Download, Bookmark, Clock, HelpCircle, Users, Calculator, ClipboardList, Layers } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useReveal } from '../hooks/useReveal';
@@ -173,6 +173,29 @@ export default function Dashboard() {
                 <p className="text-ink-800 text-sm">List a book from the marketplace page.</p>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Quick access tools */}
+        <div className="mt-8 reveal">
+          <h2 className="text-lg font-bold text-ink-900 mb-4">Quick Access</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { to: '/timetable',   icon: <Clock         className="h-5 w-5" />, label: 'Timetable',          bg: 'bg-blue-100',   color: 'text-blue-600'   },
+              { to: '/syllabus',    icon: <BookMarked    className="h-5 w-5" />, label: 'Syllabus Tracker',   bg: 'bg-emerald-100', color: 'text-emerald-600' },
+              { to: '/groups',      icon: <Users         className="h-5 w-5" />, label: 'Study Groups',       bg: 'bg-violet-100', color: 'text-violet-600'  },
+              { to: '/forum',       icon: <HelpCircle    className="h-5 w-5" />, label: 'Doubt Forum',        bg: 'bg-rose-100',   color: 'text-rose-600'   },
+              { to: '/cgpa',        icon: <Calculator    className="h-5 w-5" />, label: 'CGPA Calculator',    bg: 'bg-amber-100',  color: 'text-amber-600'  },
+              { to: '/attendance',  icon: <BookOpen      className="h-5 w-5" />, label: 'Attendance',         bg: 'bg-teal-100',   color: 'text-teal-600'   },
+              { to: '/assignments', icon: <ClipboardList className="h-5 w-5" />, label: 'Assignments',        bg: 'bg-pink-100',   color: 'text-pink-600'   },
+              { to: '/flashcards',  icon: <Layers        className="h-5 w-5" />, label: 'Flashcards',         bg: 'bg-indigo-100', color: 'text-indigo-600' },
+            ].map(({ to, icon, label, bg, color }) => (
+              <Link key={to} to={to}
+                className="card-hover flex items-center gap-3 bg-white border border-parchment-200 rounded-xl p-4 shadow-sm hover:border-accent-primary/30 transition-all">
+                <div className={`${bg} ${color} p-2.5 rounded-lg shrink-0`}>{icon}</div>
+                <span className="text-sm font-semibold text-ink-900">{label}</span>
+              </Link>
+            ))}
           </div>
         </div>
       </div>

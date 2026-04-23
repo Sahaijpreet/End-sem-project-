@@ -1,25 +1,49 @@
 import { useEffect, useRef, useState } from 'react';
-import { Search, FileText, Library, Sparkles, ArrowRight, BookOpen, Trophy, Zap, Users, Star } from 'lucide-react';
+import { Search, FileText, Library, Sparkles, ArrowRight, BookOpen, Trophy, Users, Clock, HelpCircle, ChevronRight } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../lib/api';
 import { useReveal } from '../hooks/useReveal';
 
-/* ── animated counter ── */
+const WORDS = ['Better Grades.', 'Smarter Study.', 'Real Results.', 'Your Future.'];
+
+function Typewriter() {
+  const [idx, setIdx] = useState(0);
+  const [displayed, setDisplayed] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  useEffect(() => {
+    const word = WORDS[idx];
+    if (!deleting && displayed.length < word.length) {
+      const t = setTimeout(() => setDisplayed(word.slice(0, displayed.length + 1)), 80);
+      return () => clearTimeout(t);
+    }
+    if (!deleting && displayed.length === word.length) {
+      const t = setTimeout(() => setDeleting(true), 1800);
+      return () => clearTimeout(t);
+    }
+    if (deleting && displayed.length > 0) {
+      const t = setTimeout(() => setDisplayed(displayed.slice(0, -1)), 45);
+      return () => clearTimeout(t);
+    }
+    if (deleting && displayed.length === 0) { setDeleting(false); setIdx((i) => (i + 1) % WORDS.length); }
+  }, [displayed, deleting, idx]);
+  return (
+    <span style={{ background: 'linear-gradient(90deg,#6b7c3a,#8a9a4a,#b5c26a,#6b7c3a)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', animation: 'shimmer 3s linear infinite' }}>
+      {displayed}<span className="border-r-2 border-green-600 ml-0.5 animate-pulse" style={{ WebkitTextFillColor: 'transparent' }} />
+    </span>
+  );
+}
+
 function Counter({ target, duration = 1800 }) {
   const [val, setVal] = useState(0);
   const ref = useRef(null);
   useEffect(() => {
     if (typeof target !== 'number') { setVal(target); return; }
-    const observer = new IntersectionObserver(([entry]) => {
-      if (!entry.isIntersecting) return;
+    const observer = new IntersectionObserver(([e]) => {
+      if (!e.isIntersecting) return;
       observer.disconnect();
       let start = 0;
       const step = Math.ceil(target / (duration / 16));
-      const timer = setInterval(() => {
-        start += step;
-        if (start >= target) { setVal(target); clearInterval(timer); }
-        else setVal(start);
-      }, 16);
+      const timer = setInterval(() => { start += step; if (start >= target) { setVal(target); clearInterval(timer); } else setVal(start); }, 16);
     }, { threshold: 0.5 });
     if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
@@ -27,14 +51,16 @@ function Counter({ target, duration = 1800 }) {
   return <span ref={ref}>{typeof target === 'number' ? val.toLocaleString() : target}</span>;
 }
 
-/* ── floating particles ── */
-const PARTICLES = Array.from({ length: 18 }, (_, i) => ({
-  id: i,
-  size: 4 + Math.random() * 10,
-  left: Math.random() * 100,
-  delay: Math.random() * 8,
-  duration: 6 + Math.random() * 8,
-}));
+const FEATURES = [
+  { icon: <Sparkles className="h-6 w-6" />, title: 'AI Summaries',  desc: 'Instant PDF summaries powered by Gemini AI', from: '#6b7c3a', to: '#8a9a4a', link: '/ai-summary',    span: 'md:col-span-2' },
+  { icon: <FileText  className="h-6 w-6" />, title: 'Notes Repo',   desc: 'Peer-shared notes by subject & semester',   from: '#556130', to: '#6b7c3a', link: '/notes',          span: '' },
+  { icon: <Library   className="h-6 w-6" />, title: 'Book Exchange',desc: 'Trade textbooks with campus students',       from: '#556130', to: '#8a9a4a', link: '/book-exchange',  span: '' },
+  { icon: <HelpCircle className="h-6 w-6"/>, title: 'Doubt Forum',  desc: 'Ask questions, get peer answers',           from: '#3d5228', to: '#7a8f3a', link: '/forum',          span: '' },
+  { icon: <Users     className="h-6 w-6" />, title: 'Study Groups', desc: 'Real-time group chats by subject',          from: '#3d5228', to: '#6b7c3a', link: '/groups',         span: '' },
+  { icon: <Trophy    className="h-6 w-6" />, title: 'Leaderboard',  desc: 'Compete with top contributors',             from: '#713f12', to: '#a16207', link: '/leaderboard',    span: '' },
+  { icon: <Clock     className="h-6 w-6" />, title: 'Timetable',    desc: 'Manage your weekly schedule',               from: '#3d5228', to: '#4a5c2a', link: '/timetable',      span: '' },
+  { icon: <BookOpen  className="h-6 w-6" />, title: 'PYQ Papers',   desc: 'Past year question papers archive',         from: '#556130', to: '#6b7c3a', link: '/pyqs',           span: '' },
+];
 
 export default function Home() {
   const [stats, setStats] = useState(null);
@@ -43,162 +69,141 @@ export default function Home() {
   useReveal();
 
   useEffect(() => {
-    apiFetch('/api/public/stats', { skipAuth: true })
-      .then((r) => r.success && setStats(r.data))
-      .catch(() => {});
+    apiFetch('/api/public/stats', { skipAuth: true }).then((r) => r.success && setStats(r.data)).catch(() => {});
   }, []);
-
-  function onSearch(e) {
-    e.preventDefault();
-    const query = q.trim();
-    navigate(query ? `/notes?q=${encodeURIComponent(query)}` : '/notes');
-  }
 
   return (
     <div className="flex flex-col min-h-screen overflow-x-hidden">
 
       {/* ── HERO ── */}
-      <section className="relative bg-white overflow-hidden min-h-[92vh] flex items-center">
+      <section className="relative min-h-screen flex items-center overflow-hidden" style={{ background: 'linear-gradient(160deg, #f7f7e8 0%, #f0f0d8 40%, #f7f7e8 100%)' }}>
 
-        {/* animated gradient bg */}
-        <div className="absolute inset-0 gradient-animate opacity-60" />
-
-        {/* particles */}
-        <div className="particles-bg">
-          {PARTICLES.map((p) => (
-            <div
-              key={p.id}
-              className="particle"
-              style={{
-                width: p.size,
-                height: p.size,
-                left: `${p.left}%`,
-                bottom: '-20px',
-                animationDuration: `${p.duration}s`,
-                animationDelay: `${p.delay}s`,
-              }}
-            />
-          ))}
+        {/* forest blobs */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute -top-40 -left-40 w-[550px] h-[550px] rounded-full blur-3xl opacity-30 animate-float-slow" style={{ background: 'radial-gradient(circle, #8a9a4a, #6b7c3a)' }} />
+          <div className="absolute top-10 right-[-80px] w-[400px] h-[400px] rounded-full blur-3xl opacity-20 animate-float" style={{ background: 'radial-gradient(circle, #8a9a4a, #b5c26a)', animationDelay: '2s' }} />
+          <div className="absolute bottom-[-60px] left-[25%] w-[380px] h-[380px] rounded-full blur-3xl opacity-20 animate-float-slow" style={{ background: 'radial-gradient(circle, #7a8f3a, #556130)', animationDelay: '4s' }} />
+          <div className="absolute bottom-10 right-10 w-[220px] h-[220px] rounded-full blur-3xl opacity-15 animate-float" style={{ background: 'radial-gradient(circle, #a16207, #713f12)', animationDelay: '1s' }} />
+          {/* leaf dot pattern */}
+          <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: 'radial-gradient(circle, #6b7c3a 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
         </div>
 
-        {/* big blurred circles */}
-        <div className="absolute -top-32 -left-32 w-96 h-96 bg-accent-primary/10 rounded-full blur-3xl animate-float-slow" />
-        <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-indigo-300/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-amber-100/20 rounded-full blur-3xl" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10 w-full">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
 
-        {/* floating icons */}
-        <div className="absolute top-20 left-10 animate-float opacity-20 hidden lg:block" style={{ animationDelay: '0s' }}>
-          <BookOpen className="h-16 w-16 text-accent-primary" />
-        </div>
-        <div className="absolute top-32 right-16 animate-float opacity-15 hidden lg:block" style={{ animationDelay: '1.5s' }}>
-          <Sparkles className="h-12 w-12 text-indigo-400" />
-        </div>
-        <div className="absolute bottom-32 left-20 animate-float opacity-15 hidden lg:block" style={{ animationDelay: '3s' }}>
-          <Star className="h-10 w-10 text-amber-400" />
-        </div>
-        <div className="absolute bottom-24 right-24 animate-float-slow opacity-20 hidden lg:block" style={{ animationDelay: '1s' }}>
-          <Trophy className="h-14 w-14 text-accent-primary" />
-        </div>
+            {/* Left */}
+            <div>
+              <div className="animate-fade-up inline-flex items-center gap-2 bg-yellow-100 border border-yellow-600/30 rounded-full px-4 py-1.5 text-sm font-semibold text-stone-700 mb-8">
+                <span className="w-2 h-2 rounded-full bg-green-600 animate-pulse inline-block" />
+                AI-Powered Academic Hub
+              </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 relative z-10 text-center w-full">
+              <h1 className="animate-fade-up delay-100 text-5xl md:text-6xl lg:text-7xl font-extrabold text-stone-900 tracking-tight leading-[1.1] mb-6">
+                Smarter Notes.<br />
+                <Typewriter />
+              </h1>
 
-          {/* badge */}
-          <div className="animate-fade-up inline-flex items-center gap-2 bg-white/80 backdrop-blur border border-parchment-200 rounded-full px-4 py-1.5 text-sm font-medium text-accent-primary shadow-sm mb-8">
-            <span className="w-2 h-2 rounded-full bg-accent-primary animate-pulse inline-block" />
-            AI-Powered Academic Hub
-          </div>
+              <p className="animate-fade-up delay-200 text-lg text-gray-600 max-w-lg mb-10 leading-relaxed">
+                The all-in-one academic platform — AI summaries, peer notes, book exchange, study groups, and more. Built for students, by students.
+              </p>
 
-          <h1 className="animate-fade-up delay-100 text-5xl md:text-7xl font-extrabold text-ink-900 tracking-tight leading-tight mb-6">
-            Smarter Notes.{' '}
-            <span className="shimmer-text">Better Grades.</span>
-          </h1>
+              <form onSubmit={(e) => { e.preventDefault(); navigate(q.trim() ? `/notes?q=${encodeURIComponent(q.trim())}` : '/notes'); }}
+                className="animate-fade-up delay-300 relative mb-8 group">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Search className="h-5 w-5 text-yellow-700/50 group-focus-within:text-green-700 transition-colors" />
+                </div>
+                <input type="text" value={q} onChange={(e) => setQ(e.target.value)}
+                  className="w-full pl-12 pr-32 py-4 bg-white border-2 border-yellow-700/20 rounded-2xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-yellow-700 focus:bg-white text-base transition-all shadow-sm hover:shadow-md"
+                  placeholder="Search notes, subjects, books…" />
+                <button type="submit"
+                  className="absolute inset-y-2 right-2 px-5 rounded-xl font-semibold text-sm text-white transition-all btn-glow"
+                  style={{ background: 'linear-gradient(135deg, #6b7c3a, #8a9a4a)' }}>
+                  Search
+                </button>
+              </form>
 
-          <p className="animate-fade-up delay-200 mt-4 text-xl text-ink-800 max-w-3xl mx-auto mb-10">
-            The AI-enabled academic hub for university students. Find peer notes, get instant AI summaries, and exchange textbooks seamlessly.
-          </p>
+              <div className="animate-fade-up delay-400 flex flex-wrap gap-3">
+                <Link to="/auth"
+                  className="inline-flex items-center gap-2 px-7 py-3.5 text-white rounded-2xl font-bold text-base shadow-lg btn-glow"
+                  style={{ background: 'linear-gradient(135deg, #556130, #8a9a4a)' }}>
+                  Get Started Free <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link to="/notes"
+                  className="inline-flex items-center gap-2 px-7 py-3.5 bg-white text-stone-700 rounded-2xl font-semibold text-base border border-yellow-700/20 hover:bg-yellow-50 transition-all shadow-sm">
+                  Browse Notes
+                </Link>
+              </div>
 
-          <form onSubmit={onSearch} className="animate-fade-up delay-300 max-w-2xl mx-auto mb-10 relative group">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Search className="h-6 w-6 text-slate-400 group-focus-within:text-accent-primary transition-colors" />
+              <div className="animate-fade-up delay-500 flex gap-8 mt-10">
+                {[
+                  { val: stats?.totalUsers ?? '—', label: 'Students', color: '#6b7c3a' },
+                  { val: stats?.totalNotes ?? '—', label: 'Notes',    color: '#6b7c3a' },
+                  { val: stats?.totalBooks ?? '—', label: 'Books',    color: '#a16207' },
+                ].map(({ val, label, color }) => (
+                  <div key={label}>
+                    <div className="text-2xl font-extrabold" style={{ color }}>
+                      <Counter target={typeof val === 'number' ? val : val} />
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5">{label}</div>
+                  </div>
+                ))}
+              </div>
             </div>
-            <input
-              type="text"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="block w-full pl-12 pr-36 py-4 border-2 border-parchment-200 rounded-full text-lg shadow-sm focus:ring-2 focus:ring-accent-primary focus:border-accent-primary bg-white/90 backdrop-blur placeholder-slate-400 transition-all hover:shadow-lg focus:shadow-xl"
-              placeholder="Search for subjects, topics, or books..."
-            />
-            <button type="submit" className="absolute inset-y-2 right-2 px-6 bg-accent-primary text-white rounded-full font-medium hover:bg-accent-hover transition-all btn-glow">
-              Search
-            </button>
-          </form>
 
-          <div className="animate-fade-up delay-400 flex flex-col sm:flex-row justify-center gap-4">
-            <Link to="/auth" className="inline-flex items-center justify-center px-8 py-4 text-base font-medium rounded-full text-white bg-accent-primary hover:bg-accent-hover md:text-lg shadow-lg btn-glow animate-pulse-glow">
-              Join the Community
-            </Link>
-            <Link to="/upload" className="inline-flex items-center justify-center px-8 py-4 border-2 border-parchment-200 text-base font-medium rounded-full text-ink-800 bg-white/80 hover:bg-parchment-50 hover:border-parchment-300 md:text-lg transition-all btn-glow">
-              Upload Notes <ArrowRight className="ml-2 h-5 w-5 animate-bounce-subtle" />
-            </Link>
-          </div>
-
-          {/* scroll indicator */}
-          <div className="animate-fade-up delay-600 mt-16 flex flex-col items-center gap-2 opacity-50">
-            <span className="text-xs text-ink-800 tracking-widest uppercase">Scroll to explore</span>
-            <div className="w-5 h-8 border-2 border-ink-800 rounded-full flex items-start justify-center p-1">
-              <div className="w-1 h-2 bg-ink-800 rounded-full animate-bounce" />
+            {/* Right — floating cards */}
+            <div className="hidden lg:block relative h-[520px]">
+              {[
+                { icon: <Sparkles className="h-5 w-5" />, title: 'AI Summary',   sub: 'Gemini-powered',    top: '0%',  left: '10%', delay: '0s',   from: '#6b7c3a', to: '#8a9a4a' },
+                { icon: <FileText  className="h-5 w-5" />, title: 'Notes Repo',  sub: 'Peer-shared notes', top: '18%', left: '55%', delay: '0.6s', from: '#556130', to: '#6b7c3a' },
+                { icon: <Trophy    className="h-5 w-5" />, title: 'Leaderboard', sub: 'Top contributors',  top: '45%', left: '0%',  delay: '1.2s', from: '#713f12', to: '#a16207' },
+                { icon: <Users     className="h-5 w-5" />, title: 'Study Groups',sub: 'Real-time chat',    top: '58%', left: '52%', delay: '1.8s', from: '#3d5228', to: '#7a8f3a' },
+                { icon: <HelpCircle className="h-5 w-5"/>, title: 'Doubt Forum', sub: 'Get answers fast',  top: '80%', left: '22%', delay: '2.4s', from: '#556130', to: '#8a9a4a' },
+              ].map(({ icon, title, sub, top, left, delay, from, to }) => (
+                <div key={title} className="absolute bg-white/90 backdrop-blur rounded-2xl p-4 w-44 shadow-xl border border-yellow-100 animate-float bento-card"
+                  style={{ top, left, animationDelay: delay }}>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white mb-2" style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}>
+                    {icon}
+                  </div>
+                  <p className="font-bold text-stone-900 text-sm">{title}</p>
+                  <p className="text-gray-500 text-xs mt-0.5">{sub}</p>
+                </div>
+              ))}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56 rounded-full blur-3xl opacity-25 animate-glow-pulse"
+                style={{ background: 'radial-gradient(circle, #8a9a4a, #6b7c3a)' }} />
             </div>
           </div>
+        </div>
+
+        {/* bottom wave */}
+        <div className="absolute bottom-0 left-0 right-0 overflow-hidden leading-none">
+          <svg viewBox="0 0 1440 60" className="w-full" preserveAspectRatio="none" style={{ height: 60 }}>
+            <path d="M0,30 C360,60 1080,0 1440,30 L1440,60 L0,60 Z" fill="#f7f7e8" />
+          </svg>
         </div>
       </section>
 
       {/* ── FEATURES ── */}
-      <section className="py-24 bg-parchment-50 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-accent-primary/30 to-transparent" />
-
+      <section className="py-12 relative overflow-hidden" style={{ background: '#f7f7e8' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16 reveal">
-            <h2 className="text-4xl font-bold text-ink-900">Everything you need to succeed</h2>
-            <p className="mt-4 text-lg text-ink-800">Built by students, for students. Powered by advanced AI.</p>
+          <div className="text-center mb-8">
+            <span className="inline-block text-xs font-bold tracking-widest uppercase mb-3 px-3 py-1 rounded-full bg-yellow-200/60 text-stone-700">Everything in one place</span>
+            <h2 className="text-4xl md:text-5xl font-extrabold text-stone-900 mt-3">Your academic toolkit</h2>
+            <p className="mt-4 text-gray-500 text-lg max-w-2xl mx-auto">8 powerful features to make university life easier.</p>
           </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                icon: <Sparkles className="h-7 w-7 text-accent-primary" />,
-                bg: 'bg-indigo-100',
-                title: 'AI Summarization',
-                desc: 'Turn long lecture PDFs into concise, study-ready summaries. Save hours of reading time.',
-                delay: 'delay-100',
-                link: '/ai-summary',
-              },
-              {
-                icon: <FileText className="h-7 w-7 text-emerald-600" />,
-                bg: 'bg-emerald-100',
-                title: 'Notes Repository',
-                desc: 'Access peer-shared notes organized by semester and subject. Rate, comment, and bookmark.',
-                delay: 'delay-200',
-                link: '/notes',
-              },
-              {
-                icon: <Library className="h-7 w-7 text-amber-600" />,
-                bg: 'bg-amber-100',
-                title: 'Book Exchange',
-                desc: 'Borrow, lend, or trade physical books with students on your campus.',
-                delay: 'delay-300',
-                link: '/book-exchange',
-              },
-            ].map(({ icon, bg, title, desc, delay, link }) => (
-              <Link key={title} to={link} className={`reveal ${delay} card-hover bg-white p-8 rounded-2xl shadow-sm border border-parchment-200 group relative overflow-hidden block`}>
-                {/* animated corner glow */}
-                <div className="absolute -top-10 -right-10 w-32 h-32 bg-accent-primary/5 rounded-full group-hover:scale-150 transition-transform duration-500" />
-                <div className={`w-14 h-14 ${bg} rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300`}>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {FEATURES.map(({ icon, title, desc, from, to, link, span }, i) => (
+              <Link key={title} to={link}
+                className={`${span} bento-card bg-white rounded-2xl p-6 group relative overflow-hidden border border-yellow-100 shadow-sm hover:shadow-lg transition-all`}>
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-[0.04] transition-opacity duration-500 rounded-2xl"
+                  style={{ background: `linear-gradient(135deg, ${from}, ${to})` }} />
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center text-white mb-4 group-hover:scale-110 transition-transform duration-300"
+                  style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}>
                   {icon}
                 </div>
-                <h3 className="text-xl font-bold text-ink-900 mb-3">{title}</h3>
-                <p className="text-ink-800">{desc}</p>
-                <div className="mt-4 flex items-center gap-1 text-accent-primary text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                  Explore <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                <h3 className="font-bold text-stone-900 text-base mb-1">{title}</h3>
+                <p className="text-gray-500 text-sm leading-relaxed">{desc}</p>
+                <div className="mt-4 flex items-center gap-1 text-xs font-semibold opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: from }}>
+                  Open <ChevronRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
                 </div>
               </Link>
             ))}
@@ -206,95 +211,107 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── EXTRA FEATURES ── */}
-      <section className="py-20 bg-white relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div className="reveal-left space-y-6">
-              <h2 className="text-4xl font-bold text-ink-900">More than just notes</h2>
-              <p className="text-ink-800 text-lg">SAAR brings your entire academic life into one place.</p>
-              <div className="space-y-4">
-                {[
-                  { icon: <Trophy className="h-5 w-5 text-amber-500" />, text: 'Leaderboard — compete with top contributors' },
-                  { icon: <Zap className="h-5 w-5 text-indigo-500" />, text: 'PYQ Repository — past year question papers' },
-                  { icon: <Users className="h-5 w-5 text-emerald-500" />, text: 'Real-time chat for book exchanges' },
-                  { icon: <Star className="h-5 w-5 text-accent-primary" />, text: 'Rate & comment on notes and PYQs' },
-                ].map(({ icon, text }, i) => (
-                  <div key={i} className={`reveal delay-${(i + 1) * 100} flex items-center gap-3 p-3 rounded-xl hover:bg-parchment-50 transition-colors`}>
-                    <div className="w-9 h-9 bg-parchment-100 rounded-lg flex items-center justify-center shrink-0">{icon}</div>
-                    <span className="text-ink-800 font-medium">{text}</span>
-                  </div>
-                ))}
-              </div>
-              <Link to="/auth" className="inline-flex items-center gap-2 px-6 py-3 bg-accent-primary text-white rounded-full font-medium btn-glow">
-                Get started free <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
-
-            {/* animated visual */}
-            <div className="reveal relative flex items-center justify-center h-80">
-              <div className="absolute w-64 h-64 bg-parchment-100 rounded-full animate-spin-slow opacity-30" />
-              <div className="absolute w-48 h-48 bg-indigo-100 rounded-full animate-spin-slow opacity-20" style={{ animationDirection: 'reverse', animationDuration: '8s' }} />
-              <div className="relative z-10 grid grid-cols-2 gap-4">
-                {[
-                  { icon: <Sparkles className="h-8 w-8 text-accent-primary" />, label: 'AI Summary', bg: 'bg-white' },
-                  { icon: <FileText className="h-8 w-8 text-emerald-600" />, label: 'Notes', bg: 'bg-white' },
-                  { icon: <Trophy className="h-8 w-8 text-amber-500" />, label: 'Leaderboard', bg: 'bg-white' },
-                  { icon: <Library className="h-8 w-8 text-indigo-500" />, label: 'Books', bg: 'bg-white' },
-                ].map(({ icon, label, bg }, i) => (
-                  <div key={label} className={`${bg} rounded-2xl shadow-md border border-parchment-200 p-4 flex flex-col items-center gap-2 card-hover animate-float`}
-                    style={{ animationDelay: `${i * 0.7}s` }}>
+      {/* ── HOW IT WORKS ── */}
+      <section className="py-12 bg-white relative overflow-hidden">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-8">
+            <span className="inline-block text-xs font-bold tracking-widest uppercase mb-3 px-3 py-1 rounded-full bg-yellow-100 text-yellow-800">Simple as 1-2-3</span>
+            <h2 className="text-4xl font-extrabold text-stone-900 mt-3">How SAAR works</h2>
+          </div>
+          <div className="flex flex-col md:flex-row gap-6 items-stretch">
+            {[
+              { step: '01', title: 'Sign up free',   desc: 'Create your account in seconds. No credit card needed.',                 icon: <Users    className="h-8 w-8" />, from: '#6b7c3a', to: '#8a9a4a' },
+              { step: '02', title: 'Find or upload', desc: 'Browse notes, PYQs, and books — or contribute your own.',                icon: <FileText className="h-8 w-8" />, from: '#556130', to: '#8a9a4a' },
+              { step: '03', title: 'Study smarter',  desc: 'Use AI summaries, join study groups, and track your syllabus progress.', icon: <Sparkles className="h-8 w-8" />, from: '#3d5228', to: '#7a8f3a' },
+            ].map(({ step, title, desc, icon, from, to }, i) => (
+              <>
+                <div key={step} className="relative rounded-2xl p-6 border border-yellow-100 shadow-sm hover:shadow-md transition-all md:col-span-1 overflow-hidden" style={{ background: '#f7f7e8' }}>
+                  <div className="text-5xl font-black absolute top-3 right-4 select-none opacity-[0.07] text-green-900 leading-none">{step}</div>
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white mb-4"
+                    style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}>
                     {icon}
-                    <span className="text-xs font-semibold text-ink-900">{label}</span>
                   </div>
-                ))}
-              </div>
-            </div>
+                  <h3 className="text-base font-bold text-stone-900 mb-2">{title}</h3>
+                  <p className="text-gray-500 text-sm leading-relaxed">{desc}</p>
+                </div>
+                {i < 2 && (
+                  <div key={`arrow-${i}`} className="hidden md:flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-1">
+                      <div className="w-8 h-px bg-yellow-600/30" />
+                      <ArrowRight className="h-6 w-6 text-yellow-700/50" />
+                      <div className="w-8 h-px bg-yellow-600/30" />
+                    </div>
+                  </div>
+                )}
+              </>
+            ))}
           </div>
         </div>
       </section>
 
       {/* ── STATS ── */}
-      <section className="py-20 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)' }}>
-        <div className="absolute inset-0 opacity-10">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="absolute rounded-full bg-white animate-float"
-              style={{ width: 80 + i * 30, height: 80 + i * 30, left: `${i * 18}%`, top: `${20 + (i % 3) * 20}%`, animationDelay: `${i * 0.8}s`, opacity: 0.05 }} />
-          ))}
-        </div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
-          <h2 className="reveal text-3xl font-bold text-white mb-12">SAAR by the numbers</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+      <section className="py-10 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #556130 0%, #6b7c3a 40%, #6b7c3a 70%, #556130 100%)' }}>
+        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, #b5c26a 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
-              { val: stats?.totalUsers, label: 'Registered students', icon: <Users className="h-6 w-6" /> },
-              { val: stats?.totalNotes, label: 'Notes in repository', icon: <FileText className="h-6 w-6" /> },
-              { val: stats?.totalBooks, label: 'Books listed', icon: <Library className="h-6 w-6" /> },
-              { val: '∞', label: 'AI Summaries on demand', icon: <Sparkles className="h-6 w-6" /> },
+              { val: stats?.totalUsers, label: 'Students',    icon: '🌿' },
+              { val: stats?.totalNotes, label: 'Notes shared',icon: '📄' },
+              { val: stats?.totalBooks, label: 'Books listed', icon: '📚' },
+              { val: '∞',               label: 'AI Summaries', icon: '✨' },
             ].map(({ val, label, icon }, i) => (
-              <div key={label} className={`reveal delay-${i * 100} group`}>
-                <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center mx-auto mb-3 text-white group-hover:scale-110 transition-transform">
-                  {icon}
-                </div>
-                <div className="text-5xl font-extrabold text-white mb-2">
+              <div key={label}>
+                <div className="text-3xl mb-2">{icon}</div>
+                <div className="text-4xl md:text-5xl font-extrabold text-white mb-1">
                   <Counter target={typeof val === 'number' ? val : (val ?? '—')} />
                 </div>
-                <div className="text-indigo-200 text-sm">{label}</div>
+                <div className="text-green-200/70 text-sm">{label}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
+      {/* ── QUOTE ── */}
+      <section className="py-12 bg-white">
+        <div className="max-w-3xl mx-auto px-4 text-center">
+          <div className="">
+            <div className="text-5xl mb-6">🌱</div>
+            <blockquote className="text-2xl md:text-3xl font-bold text-stone-900 leading-relaxed mb-6">
+              "SAAR saved me 3 hours before my end-sem exam. The AI summary was spot on."
+            </blockquote>
+            <p className="text-gray-500">— A student who aced their semester</p>
+          </div>
+        </div>
+      </section>
+
       {/* ── CTA ── */}
-      <section className="py-24 bg-parchment-50 relative overflow-hidden">
-        <div className="absolute inset-0 gradient-animate opacity-40" />
+      <section className="py-14 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, #f7f7e8 0%, #f0f0d8 50%, #f7f7e8 100%)' }}>
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute -top-20 -left-20 w-80 h-80 rounded-full blur-3xl opacity-20 animate-float-slow" style={{ background: 'radial-gradient(circle, #8a9a4a, #6b7c3a)' }} />
+          <div className="absolute -bottom-20 -right-20 w-80 h-80 rounded-full blur-3xl opacity-20 animate-float" style={{ background: 'radial-gradient(circle, #8a9a4a, #556130)', animationDelay: '2s' }} />
+        </div>
         <div className="max-w-3xl mx-auto px-4 text-center relative z-10">
-          <div className="reveal">
-            <h2 className="text-4xl font-extrabold text-ink-900 mb-4">Ready to ace your semester?</h2>
-            <p className="text-ink-800 text-lg mb-8">Join thousands of students already using SAAR to study smarter.</p>
-            <Link to="/auth" className="inline-flex items-center gap-2 px-10 py-4 bg-accent-primary text-white rounded-full text-lg font-bold shadow-xl btn-glow animate-pulse-glow">
-              Get Started — It's Free <ArrowRight className="h-5 w-5 animate-bounce-subtle" />
-            </Link>
+          <div className="">
+            <span className="inline-block text-xs font-bold tracking-widest uppercase mb-4 px-3 py-1 rounded-full bg-yellow-200/60 text-stone-700">Start today</span>
+            <h2 className="text-5xl md:text-6xl font-extrabold text-stone-900 mb-6 leading-tight mt-3">
+              Ready to grow<br />
+              <span style={{ background: 'linear-gradient(90deg,#6b7c3a,#8a9a4a,#b5c26a,#6b7c3a)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', animation: 'shimmer 3s linear infinite', display: 'inline-block' }}>
+                smarter?
+              </span>
+            </h2>
+            <p className="text-gray-500 text-lg mb-10 max-w-xl mx-auto">Join your peers on SAAR. Free forever. No credit card required.</p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link to="/auth"
+                className="inline-flex items-center justify-center gap-2 px-10 py-4 text-white rounded-2xl text-lg font-bold shadow-xl btn-glow"
+                style={{ background: 'linear-gradient(135deg, #556130, #8a9a4a)' }}>
+                Get Started Free <ArrowRight className="h-5 w-5" />
+              </Link>
+              <Link to="/notes"
+                className="inline-flex items-center justify-center gap-2 px-10 py-4 bg-white text-stone-700 rounded-2xl text-lg font-semibold border border-yellow-700/20 hover:bg-yellow-50 transition-all shadow-sm">
+                Browse Notes
+              </Link>
+            </div>
           </div>
         </div>
       </section>

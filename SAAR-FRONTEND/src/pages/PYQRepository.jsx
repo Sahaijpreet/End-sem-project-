@@ -41,11 +41,13 @@ export default function PYQRepository() {
   async function loadPYQs() {
     setLoading(true);
     try {
-      const fetches = [apiFetch('/api/pyqs', { skipAuth: true })];
-      if (isAuthenticated) fetches.push(apiFetch('/api/auth/bookmarks'));
-      const [res, bmRes] = await Promise.all(fetches);
+      const res = await apiFetch('/api/pyqs', { skipAuth: true });
       setPyqs(res.success && Array.isArray(res.data) ? res.data : []);
-      if (bmRes?.success) setBookmarks(new Set(bmRes.data.pyqs?.map((p) => p._id) || []));
+      if (isAuthenticated) {
+        apiFetch('/api/auth/bookmarks')
+          .then((bmRes) => { if (bmRes?.success) setBookmarks(new Set(bmRes.data.pyqs?.map((p) => p._id) || [])); })
+          .catch(() => {});
+      }
     } catch { setPyqs([]); }
     finally { setLoading(false); }
   }
@@ -224,7 +226,12 @@ export default function PYQRepository() {
           {filtered.map((pyq, idx) => {
             const pdfHref = fileUrl(pyq.FileURL);
             return (
-              <div key={pyq._id} className={`reveal delay-${Math.min(idx * 100, 500)} card-hover bg-white rounded-xl shadow-sm border border-parchment-200 overflow-hidden flex flex-col`}>
+              <div key={pyq._id} className={`card-hover bg-white rounded-xl shadow-sm border border-parchment-200 overflow-hidden flex flex-col`}>
+                {pyq.CoverImage && (
+                  <div className="h-36 w-full overflow-hidden">
+                    <img src={pyq.CoverImage} alt="cover" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  </div>
+                )}
                 <div className="p-5 flex-1">
                   <div className="flex justify-between items-start mb-3">
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-accent-primary">
@@ -242,7 +249,7 @@ export default function PYQRepository() {
                     <span>·</span>
                     <span>{pyq.Year}</span>
                   </div>
-                  <p className="text-xs text-ink-800 mt-3">By {uploader}</p>
+                  <p className="text-xs text-ink-800 mt-3">By {pyq.UploaderID?.Name || 'Student'}</p>
                 </div>
                 <div className="px-5 py-3">
                   <StarRating resourceType="PYQ" resourceId={pyq._id} />

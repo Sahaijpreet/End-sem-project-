@@ -37,6 +37,7 @@ const PYQSchema = new mongoose.Schema({
   },
   Likes: [{ type: mongoose.Schema.ObjectId, ref: 'User' }],
   Downloads: { type: Number, default: 0 },
+  CoverImage: { type: String, default: '' },
 }, { timestamps: true });
 
 const PYQ = mongoose.model('PYQ', PYQSchema);

@@ -22,6 +22,10 @@ import ForumPost from './pages/ForumPost';
 import Timetable from './pages/Timetable';
 import SyllabusTracker from './pages/SyllabusTracker';
 import UserProfile from './pages/UserProfile';
+import CGPACalculator from './pages/CGPACalculator';
+import AttendanceTracker from './pages/AttendanceTracker';
+import AssignmentTracker from './pages/AssignmentTracker';
+import Flashcards from './pages/Flashcards';
 
 function App() {
   return (
@@ -48,6 +52,10 @@ function App() {
             <Route path="timetable" element={<ProtectedRoute><Timetable /></ProtectedRoute>} />
             <Route path="syllabus" element={<ProtectedRoute><SyllabusTracker /></ProtectedRoute>} />
             <Route path="user/:id" element={<UserProfile />} />
+            <Route path="cgpa" element={<ProtectedRoute><CGPACalculator /></ProtectedRoute>} />
+            <Route path="attendance" element={<ProtectedRoute><AttendanceTracker /></ProtectedRoute>} />
+            <Route path="assignments" element={<ProtectedRoute><AssignmentTracker /></ProtectedRoute>} />
+            <Route path="flashcards" element={<ProtectedRoute><Flashcards /></ProtectedRoute>} />
             <Route path="admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
           </Route>
         </Routes>

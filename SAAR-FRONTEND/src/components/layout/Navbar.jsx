@@ -76,6 +76,7 @@ export default function Navbar() {
           <Link to="/book-exchange" className="text-ink-800 hover:text-accent-primary hover:bg-indigo-50 px-3 py-2 rounded-lg text-sm font-semibold transition-all">Books</Link>
           <Link to="/groups" className="text-ink-800 hover:text-accent-primary hover:bg-indigo-50 px-3 py-2 rounded-lg text-sm font-semibold transition-all">Groups</Link>
           <Link to="/forum" className="text-ink-800 hover:text-accent-primary hover:bg-indigo-50 px-3 py-2 rounded-lg text-sm font-semibold transition-all">Forum</Link>
+          <Link to="/timetable" className="text-ink-800 hover:text-accent-primary hover:bg-indigo-50 px-3 py-2 rounded-lg text-sm font-semibold transition-all">Timetable</Link>
           <Link to="/leaderboard" className="text-ink-800 hover:text-accent-primary hover:bg-indigo-50 px-3 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1">
             <Trophy className="h-4 w-4" /> Board
           </Link>

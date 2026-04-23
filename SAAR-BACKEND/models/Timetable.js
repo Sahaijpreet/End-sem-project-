@@ -12,6 +12,7 @@ const SlotSchema = new mongoose.Schema({
 const TimetableSchema = new mongoose.Schema({
   UserID: { type: mongoose.Schema.ObjectId, ref: 'User', required: true, unique: true },
   Slots: [SlotSchema],
+  ImageURL: { type: String, default: '' },
 }, { timestamps: true });
 
 const Timetable = mongoose.model('Timetable', TimetableSchema);

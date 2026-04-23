@@ -8,6 +8,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import jwt from 'jsonwebtoken';
+import rateLimit from 'express-rate-limit';
 import User from './models/User.js';
 
 import authRoutes from './routes/authRoutes.js';
@@ -78,6 +79,13 @@ io.on('connection', (socket) => {
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Rate limiting
+const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200, standardHeaders: true, legacyHeaders: false });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { success: false, message: 'Too many attempts, try again later.' } });
+app.use('/api/', apiLimiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
 
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/saar_db')
   .then(() => console.log('MongoDB Connected Successfully'))

@@ -11,10 +11,12 @@ export const getTimetable = async (req, res) => {
 
 export const saveTimetable = async (req, res) => {
   try {
-    const { Slots } = req.body;
+    const { Slots, ImageURL } = req.body;
+    const update = { Slots };
+    if (ImageURL !== undefined) update.ImageURL = ImageURL;
     const tt = await Timetable.findOneAndUpdate(
       { UserID: req.user._id },
-      { Slots },
+      update,
       { upsert: true, new: true }
     );
     res.json({ success: true, data: tt });

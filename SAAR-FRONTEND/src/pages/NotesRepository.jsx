@@ -146,7 +146,7 @@ export default function NotesRepository() {
             const pdfHref = fileUrl(note.FileURL);
             const isBookmarked = bookmarks.has(note._id);
             return (
-              <div key={note._id} className={`reveal delay-${Math.min(idx * 100, 500)} card-hover bg-white rounded-xl shadow-sm border border-parchment-200 overflow-hidden group flex flex-col`}>
+              <div key={note._id} className={`card-hover bg-white rounded-xl shadow-sm border border-parchment-200 overflow-hidden group flex flex-col`}>
                 {note.CoverImage && (
                   <div className="h-44 w-full overflow-hidden">
                     <img src={fileUrl(note.CoverImage)} alt="cover" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
