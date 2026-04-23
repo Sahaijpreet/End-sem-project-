@@ -54,8 +54,11 @@ export default function BookExchange() {
     try {
       const res = await apiFetch('/api/books/my-requests');
       if (res.success) setMyRequests(res.data);
-    } catch {}
-    finally { setReqLoading(false); }
+    } catch (err) {
+      console.error('Failed to load requests:', err.message);
+    } finally {
+      setReqLoading(false);
+    }
   }
 
   useEffect(() => { loadMyRequests(); }, [isAuthenticated]);

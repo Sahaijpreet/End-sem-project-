@@ -24,14 +24,18 @@ export default function Chat() {
         const found = res.data.find((c) => c._id === id);
         if (found) setConvo(found);
       }
-    } catch {}
+    } catch (err) {
+      console.error('Failed to load conversation:', err.message);
+    }
   }
 
   async function loadMessages() {
     try {
       const res = await apiFetch(`/api/chat/conversations/${id}/messages`);
       if (res.success) setMessages(res.data);
-    } catch {}
+    } catch (err) {
+      console.error('Failed to load messages:', err.message);
+    }
   }
 
   useEffect(() => {
@@ -39,8 +43,11 @@ export default function Chat() {
     async function init() {
       try {
         await Promise.all([loadConvo(), loadMessages()]);
-      } catch {}
-      finally { if (!cancelled) setLoading(false); }
+      } catch (err) {
+        console.error('Chat init error:', err.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
     init();
     const interval = setInterval(async () => {
@@ -63,8 +70,11 @@ export default function Chat() {
         body: JSON.stringify({ text: text.trim() }),
       });
       if (res.success) { setMessages((prev) => [...prev, res.data]); setText(''); }
-    } catch {}
-    finally { setSending(false); }
+    } catch (err) {
+      console.error('Send message failed:', err.message);
+    } finally {
+      setSending(false);
+    }
   }
 
   async function handleConfirm() {

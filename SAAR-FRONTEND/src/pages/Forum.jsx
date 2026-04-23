@@ -37,7 +37,7 @@ export default function Forum() {
       toast('Doubt posted!');
       setShowCreate(false);
       navigate(`/forum/${r.data._id}`);
-    } catch (e) { toast(e.message, 'error'); }
+    } catch (err) { toast(err.message, 'error'); }
   }
 
   return (

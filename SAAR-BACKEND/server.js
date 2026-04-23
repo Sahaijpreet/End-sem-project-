@@ -87,11 +87,17 @@ app.use('/api/', apiLimiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 
-mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/saar_db')
+mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('MongoDB Connected Successfully'))
   .catch(err => console.error('MongoDB Connection Error:', err));
 
 app.get('/', (req, res) => res.send('SAAR Backend API is running...'));
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(err.status || 500).json({ success: false, message: err.message || 'Internal server error' });
+});
 
 app.use('/api/public', publicRoutes);
 app.use('/api/auth', authRoutes);

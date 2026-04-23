@@ -3,6 +3,21 @@ import Note from '../models/Note.js';
 import Book from '../models/Book.js';
 import PYQ from '../models/PYQ.js';
 import ExchangeRequest from '../models/ExchangeRequest.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+function deleteUploadedFile(fileUrl) {
+  if (!fileUrl) return;
+  try {
+    const relative = fileUrl.replace(/^\/+/, '');
+    const abs = path.join(__dirname, '..', relative);
+    if (fs.existsSync(abs)) fs.unlinkSync(abs);
+  } catch {}
+}
 
 export const getStats = async (req, res) => {
   try {
@@ -23,13 +38,11 @@ export const getStats = async (req, res) => {
 export const deleteNote = async (req, res) => {
   try {
     const note = await Note.findByIdAndDelete(req.params.id);
-    
     if (!note) {
       return res.status(404).json({ success: false, message: 'Note not found' });
     }
-    
-    // In a production app, we would also delete the file from the /uploads folder here using fs.unlinkSync
-    
+    deleteUploadedFile(note.FileURL);
+    deleteUploadedFile(note.CoverImage);
     res.status(200).json({ success: true, message: 'Note deleted successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -93,6 +106,7 @@ export const deletePYQ = async (req, res) => {
   try {
     const pyq = await PYQ.findByIdAndDelete(req.params.id);
     if (!pyq) return res.status(404).json({ success: false, message: 'PYQ not found' });
+    deleteUploadedFile(pyq.FileURL);
     res.status(200).json({ success: true, message: 'PYQ deleted successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

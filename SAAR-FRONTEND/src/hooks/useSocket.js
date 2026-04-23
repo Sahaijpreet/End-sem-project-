@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
-import { API_BASE } from '../lib/api';
-import { getAuthToken } from '../lib/api';
+import { API_BASE, getAuthToken } from '../lib/api';
 
 let socketInstance = null;
 
@@ -17,9 +16,13 @@ export function getSocket() {
 
 export function useSocket() {
   const socket = getSocket();
+  const socketRef = useRef(socket);
   useEffect(() => {
-    socket.connect();
-    return () => { socket.disconnect(); socketInstance = null; };
+    socketRef.current.connect();
+    return () => {
+      socketRef.current.disconnect();
+      socketInstance = null;
+    };
   }, []);
-  return socket;
+  return socketRef.current;
 }

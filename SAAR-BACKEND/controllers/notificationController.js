@@ -3,7 +3,9 @@ import Notification from '../models/Notification.js';
 export const createNotification = async (userId, type, message, link = '') => {
   try {
     await Notification.create({ UserID: userId, Type: type, Message: message, Link: link });
-  } catch {}
+  } catch (err) {
+    console.error('Notification creation failed:', err.message);
+  }
 };
 
 export const getMyNotifications = async (req, res) => {

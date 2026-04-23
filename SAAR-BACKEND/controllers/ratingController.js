@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Rating from '../models/Rating.js';
 
 export const rateResource = async (req, res) => {
@@ -25,7 +26,7 @@ export const getResourceRating = async (req, res) => {
   try {
     const { resourceType, resourceId } = req.params;
     const agg = await Rating.aggregate([
-      { $match: { ResourceType: resourceType, ResourceID: new (await import('mongoose')).default.Types.ObjectId(resourceId) } },
+      { $match: { ResourceType: resourceType, ResourceID: new mongoose.Types.ObjectId(resourceId) } },
       { $group: { _id: null, avg: { $avg: '$Stars' }, count: { $sum: 1 } } },
     ]);
     const { avg = 0, count = 0 } = agg[0] || {};
