@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Search, Filter, Eye, ChevronDown, ThumbsUp, Download, Bookmark, BookmarkCheck, MessageSquare, X } from 'lucide-react';
+import { Search, Filter, ChevronDown, Download, Bookmark, BookmarkCheck, MessageSquare, X } from 'lucide-react';
 import { apiFetch, fileUrl } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -20,7 +20,6 @@ export default function NotesRepository() {
   const [error, setError] = useState('');
   const [filterSubjects, setFilterSubjects] = useState(new Set());
   const [filterSemesters, setFilterSemesters] = useState(new Set());
-  const [likingId, setLikingId] = useState(null);
   const [bookmarks, setBookmarks] = useState(new Set());
   const [activeComment, setActiveComment] = useState(null);
 
@@ -63,16 +62,6 @@ export default function NotesRepository() {
   }
   function toggleSemester(sem) {
     setFilterSemesters((prev) => { const n = new Set(prev); n.has(sem) ? n.delete(sem) : n.add(sem); return n; });
-  }
-
-  async function handleLike(noteId) {
-    if (!isAuthenticated) { toast('Log in to like notes.', 'error'); return; }
-    setLikingId(noteId);
-    try {
-      const res = await apiFetch(`/api/notes/${noteId}/like`, { method: 'POST', body: JSON.stringify({}) });
-      setNotes((prev) => prev.map((n) => n._id === noteId ? { ...n, Likes: Array(res.data.likes).fill(null), _liked: res.data.liked } : n));
-    } catch (e) { toast(e.message || 'Failed to like note.', 'error'); }
-    finally { setLikingId(null); }
   }
 
   async function handleBookmark(noteId) {
@@ -168,12 +157,13 @@ export default function NotesRepository() {
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-accent-primary">{note.Subject}</span>
                     <span className="text-xs font-semibold text-slate-400">Sem {note.Semester}</span>
                   </div>
-                  <h3 className="text-sm font-bold text-ink-900 mb-1 line-clamp-2">{note.Title}</h3>
+                  <h3 className="text-sm font-bold text-ink-900 mb-1 line-clamp-2">
+                  <Link to={`/notes/${note._id}`} className="hover:text-accent-primary hover:underline">{note.Title}</Link>
+                </h3>
                   <p className="text-xs text-ink-800 mb-2">By {note.UploaderID?.Name || 'Student'}</p>
                   <StarRating resourceType="Note" resourceId={note._id} />
                   <div className="flex gap-3 mt-1 text-xs text-ink-800">
                     <span>{note.Downloads ?? 0} downloads</span>
-                    <span>{note.Likes?.length ?? 0} likes</span>
                   </div>
                 </div>
                 <div className="bg-parchment-50 px-3 py-2 border-t border-parchment-200 mt-auto flex gap-1.5 flex-wrap">
@@ -185,10 +175,6 @@ export default function NotesRepository() {
                     className="flex items-center justify-center py-2 px-3 border border-parchment-300 rounded-lg text-sm font-medium text-ink-900 bg-white hover:bg-parchment-50">
                     AI
                   </Link>
-                  <button type="button" disabled={likingId === note._id} onClick={() => handleLike(note._id)}
-                    className={`flex items-center justify-center gap-1 py-2 px-3 border rounded-lg text-sm font-medium transition-colors ${note._liked ? 'bg-indigo-100 border-indigo-300 text-accent-primary' : 'border-parchment-300 text-ink-800 bg-white hover:bg-parchment-50'}`}>
-                    <ThumbsUp className="h-4 w-4" />
-                  </button>
                   <button type="button" onClick={() => handleBookmark(note._id)}
                     className={`flex items-center justify-center py-2 px-3 border rounded-lg text-sm transition-colors ${isBookmarked ? 'bg-violet-100 border-violet-300 text-violet-600' : 'border-parchment-300 text-ink-800 bg-white hover:bg-parchment-50'}`}>
                     {isBookmarked ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}

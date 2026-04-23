@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Filter, ThumbsUp, ChevronDown, BookMarked, UploadCloud, X, File, Download, Bookmark, BookmarkCheck, MessageSquare } from 'lucide-react';
+import { Search, Filter, ChevronDown, BookMarked, UploadCloud, X, File, Download, Bookmark, BookmarkCheck, MessageSquare } from 'lucide-react';
 import { apiFetch, fileUrl } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -22,7 +22,6 @@ export default function PYQRepository() {
   const [filterSubjects, setFilterSubjects] = useState(new Set());
   const [filterSemesters, setFilterSemesters] = useState(new Set());
   const [filterExamTypes, setFilterExamTypes] = useState(new Set());
-  const [likingId, setLikingId] = useState(null);
   const [bookmarks, setBookmarks] = useState(new Set());
   const [activeComment, setActiveComment] = useState(null);
 
@@ -70,16 +69,6 @@ export default function PYQRepository() {
       next.has(val) ? next.delete(val) : next.add(val);
       return next;
     });
-  }
-
-  async function handleLike(id) {
-    if (!isAuthenticated) { toast('Log in to like PYQs.', 'error'); return; }
-    setLikingId(id);
-    try {
-      const res = await apiFetch(`/api/pyqs/${id}/like`, { method: 'POST', body: JSON.stringify({}) });
-      setPyqs((prev) => prev.map((p) => p._id === id ? { ...p, Likes: Array(res.data.likes).fill(null), _liked: res.data.liked } : p));
-    } catch (e) { toast(e.message, 'error'); }
-    finally { setLikingId(null); }
   }
 
   async function handleBookmark(id) {
@@ -259,19 +248,12 @@ export default function PYQRepository() {
                   <StarRating resourceType="PYQ" resourceId={pyq._id} />
                   <div className="flex gap-3 mt-1 text-xs text-ink-800">
                     <span>{pyq.Downloads ?? 0} downloads</span>
-                    <span>{pyq.Likes?.length ?? 0} likes</span>
                   </div>
                 </div>
                 <div className="bg-parchment-50 px-5 py-3 border-t border-parchment-200 flex gap-1.5 flex-wrap">
                   <button onClick={() => handleDownload(pyq._id, fileUrl(pyq.FileURL))}
                     className="flex-1 flex items-center justify-center gap-2 py-2 px-4 text-sm font-medium rounded-lg text-white bg-accent-primary hover:bg-accent-hover transition-colors">
                     <Download className="h-4 w-4" /> Open
-                  </button>
-                  <button type="button" disabled={likingId === pyq._id} onClick={() => handleLike(pyq._id)}
-                    className={`flex items-center justify-center gap-1 py-2 px-3 border rounded-lg text-sm font-medium transition-colors ${
-                      pyq._liked ? 'bg-indigo-100 border-indigo-300 text-accent-primary' : 'border-parchment-300 text-ink-800 bg-white hover:bg-parchment-50'
-                    }`}>
-                    <ThumbsUp className="h-4 w-4" />
                   </button>
                   <button type="button" onClick={() => handleBookmark(pyq._id)}
                     className={`flex items-center justify-center py-2 px-3 border rounded-lg text-sm transition-colors ${

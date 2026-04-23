@@ -1,10 +1,15 @@
 import express from 'express';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import jwt from 'jsonwebtoken';
+import User from './models/User.js';
+
 import authRoutes from './routes/authRoutes.js';
 import noteRoutes from './routes/noteRoutes.js';
 import bookRoutes from './routes/bookRoutes.js';
@@ -18,6 +23,11 @@ import commentRoutes from './routes/commentRoutes.js';
 import ratingRoutes from './routes/ratingRoutes.js';
 import searchRoutes from './routes/searchRoutes.js';
 import leaderboardRoutes from './routes/leaderboardRoutes.js';
+import studyGroupRoutes from './routes/studyGroupRoutes.js';
+import doubtRoutes from './routes/doubtRoutes.js';
+import userRoutes from './routes/userRoutes.js';
+import timetableRoutes from './routes/timetableRoutes.js';
+import syllabusRoutes from './routes/syllabusRoutes.js';
 
 dotenv.config();
 
@@ -28,12 +38,43 @@ const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const httpServer = createServer(app);
+const PORT = process.env.PORT || 5001;
 
 const corsOptions = {
   origin: process.env.FRONTEND_URL || ['http://localhost:5173', 'http://127.0.0.1:5173'],
   credentials: true,
 };
+
+// Socket.io
+const io = new Server(httpServer, { cors: corsOptions });
+
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth?.token;
+    if (!token) return next(new Error('No token'));
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    socket.user = await User.findById(decoded.id).select('-PasswordHash');
+    next();
+  } catch {
+    next(new Error('Auth failed'));
+  }
+});
+
+io.on('connection', (socket) => {
+  socket.on('join_conversation', (convId) => socket.join(`conv_${convId}`));
+  socket.on('join_group', (groupId) => socket.join(`group_${groupId}`));
+  socket.on('leave_group', (groupId) => socket.leave(`group_${groupId}`));
+
+  socket.on('send_message', ({ convId, message }) => {
+    socket.to(`conv_${convId}`).emit('new_message', message);
+  });
+
+  socket.on('send_group_message', ({ groupId, message }) => {
+    socket.to(`group_${groupId}`).emit('new_group_message', message);
+  });
+});
+
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -57,5 +98,10 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/groups', studyGroupRoutes);
+app.use('/api/forum', doubtRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/timetable', timetableRoutes);
+app.use('/api/syllabus', syllabusRoutes);
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+httpServer.listen(PORT, () => console.log(`Server running on port ${PORT}`));

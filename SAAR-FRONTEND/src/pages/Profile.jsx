@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { UserCircle, FileText, BookOpen, Mail, IdCard, Edit2, Check, X, ArrowLeftRight, Bookmark, Camera, Download } from 'lucide-react';
+import { UserCircle, FileText, BookOpen, Mail, IdCard, Edit2, Check, X, ArrowLeftRight, Bookmark, Camera, Download, ExternalLink } from 'lucide-react';
 import { apiFetch, fileUrl } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -89,7 +89,18 @@ export default function Profile() {
   const avatarSrc = avatarPreview || (user?.Avatar ? fileUrl(user.Avatar) : null);
 
   return (
-    <div className="flex-1 bg-parchment-50 py-10 min-h-[calc(100vh-4rem)]">
+    <div className="flex-1 min-h-[calc(100vh-4rem)] relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #fbf8f1 0%, #f4ebd8 40%, #fbf8f1 100%)' }}>
+
+      {/* animated bg orbs */}
+      <div className="absolute -top-20 -left-20 w-80 h-80 bg-indigo-200/20 rounded-full blur-3xl animate-float-slow pointer-events-none" />
+      <div className="absolute -bottom-20 -right-20 w-72 h-72 bg-accent-primary/10 rounded-full blur-3xl animate-float pointer-events-none" style={{ animationDelay: '2s' }} />
+      <div className="absolute top-1/3 right-0 w-56 h-56 bg-amber-100/30 rounded-full blur-3xl animate-float-slow pointer-events-none" style={{ animationDelay: '1s' }} />
+
+      {/* spinning rings */}
+      <div className="absolute top-16 right-16 w-32 h-32 border-4 border-dashed border-accent-primary/10 rounded-full animate-spin-slow pointer-events-none" />
+      <div className="absolute bottom-24 left-8 w-20 h-20 border-2 border-dashed border-indigo-300/20 rounded-full animate-spin-slow pointer-events-none" style={{ animationDirection: 'reverse' }} />
+
+      <div className="relative z-10 py-10">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
 
         {/* Profile card */}
@@ -203,14 +214,17 @@ export default function Profile() {
             <ResourceList title="My Notes" icon={<FileText className="h-5 w-5 text-accent-primary" />} loading={loading}
               items={myNotes} empty="No notes uploaded yet."
               renderItem={(n) => (
-                <div key={n._id} className="px-6 py-4 flex justify-between items-center">
-                  <div>
-                    <p className="font-medium text-ink-900">{n.Title}</p>
+                <div key={n._id} className="px-6 py-4 flex justify-between items-center gap-4">
+                  <div className="min-w-0">
+                    <p className="font-medium text-ink-900 truncate">{n.Title}</p>
                     <p className="text-sm text-ink-800">{n.Subject} · Sem {n.Semester}</p>
                   </div>
-                  <div className="flex gap-3 text-xs text-ink-800">
-                    <span>{n.Likes?.length ?? 0} likes</span>
-                    <span>{n.Downloads ?? 0} downloads</span>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-xs text-ink-800 hidden sm:block">{n.Downloads ?? 0} downloads</span>
+                    <a href={fileUrl(n.FileURL)} target="_blank" rel="noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-accent-primary text-white rounded-lg text-xs font-medium hover:bg-accent-hover transition-colors">
+                      <ExternalLink className="h-3.5 w-3.5" /> Open
+                    </a>
                   </div>
                 </div>
               )} />
@@ -235,21 +249,39 @@ export default function Profile() {
             <ResourceList title="Bookmarked Notes" icon={<Bookmark className="h-5 w-5 text-violet-500" />} loading={loading}
               items={bookmarks.notes || []} empty="No bookmarked notes."
               renderItem={(n) => (
-                <div key={n._id} className="px-6 py-4 flex justify-between items-center">
-                  <div>
-                    <p className="font-medium text-ink-900">{n.Title}</p>
+                <div key={n._id} className="px-6 py-4 flex justify-between items-center gap-4">
+                  <div className="min-w-0">
+                    <p className="font-medium text-ink-900 truncate">{n.Title}</p>
                     <p className="text-sm text-ink-800">{n.Subject} · Sem {n.Semester}</p>
                   </div>
+                  <a
+                    href={fileUrl(n.FileURL)}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => apiFetch(`/api/notes/${n._id}/download`, { method: 'POST', body: JSON.stringify({}) }).catch(() => {})}
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-accent-primary text-white rounded-lg text-xs font-medium hover:bg-accent-hover transition-colors"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" /> Open
+                  </a>
                 </div>
               )} />
             <ResourceList title="Bookmarked PYQs" icon={<Bookmark className="h-5 w-5 text-violet-500" />} loading={loading}
               items={bookmarks.pyqs || []} empty="No bookmarked PYQs."
               renderItem={(p) => (
-                <div key={p._id} className="px-6 py-4 flex justify-between items-center">
-                  <div>
-                    <p className="font-medium text-ink-900">{p.Title}</p>
+                <div key={p._id} className="px-6 py-4 flex justify-between items-center gap-4">
+                  <div className="min-w-0">
+                    <p className="font-medium text-ink-900 truncate">{p.Title}</p>
                     <p className="text-sm text-ink-800">{p.Subject} · {p.Year} · {p.ExamType}</p>
                   </div>
+                  <a
+                    href={fileUrl(p.FileURL)}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => apiFetch(`/api/pyqs/${p._id}/download`, { method: 'POST', body: JSON.stringify({}) }).catch(() => {})}
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-accent-primary text-white rounded-lg text-xs font-medium hover:bg-accent-hover transition-colors"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" /> Open
+                  </a>
                 </div>
               )} />
           </div>
@@ -284,6 +316,7 @@ export default function Profile() {
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   );
