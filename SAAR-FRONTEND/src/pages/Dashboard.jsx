@@ -184,7 +184,6 @@ export default function Dashboard() {
               { to: '/timetable',   icon: <Clock         className="h-5 w-5" />, label: 'Timetable',          bg: 'bg-blue-100',   color: 'text-blue-600'   },
               { to: '/syllabus',    icon: <BookMarked    className="h-5 w-5" />, label: 'Syllabus Tracker',   bg: 'bg-emerald-100', color: 'text-emerald-600' },
               { to: '/groups',      icon: <Users         className="h-5 w-5" />, label: 'Study Groups',       bg: 'bg-violet-100', color: 'text-violet-600'  },
-              { to: '/forum',       icon: <HelpCircle    className="h-5 w-5" />, label: 'Doubt Forum',        bg: 'bg-rose-100',   color: 'text-rose-600'   },
               { to: '/cgpa',        icon: <Calculator    className="h-5 w-5" />, label: 'CGPA Calculator',    bg: 'bg-amber-100',  color: 'text-amber-600'  },
               { to: '/attendance',  icon: <BookOpen      className="h-5 w-5" />, label: 'Attendance',         bg: 'bg-teal-100',   color: 'text-teal-600'   },
               { to: '/assignments', icon: <ClipboardList className="h-5 w-5" />, label: 'Assignments',        bg: 'bg-pink-100',   color: 'text-pink-600'   },

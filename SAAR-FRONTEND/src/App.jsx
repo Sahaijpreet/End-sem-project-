@@ -17,8 +17,6 @@ import Chat from './pages/Chat';
 import Inbox from './pages/Inbox';
 import Leaderboard from './pages/Leaderboard';
 import StudyGroups from './pages/StudyGroups';
-import Forum from './pages/Forum';
-import ForumPost from './pages/ForumPost';
 import Timetable from './pages/Timetable';
 import SyllabusTracker from './pages/SyllabusTracker';
 import UserProfile from './pages/UserProfile';
@@ -47,8 +45,6 @@ function App() {
             <Route path="chat/:id" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
             <Route path="leaderboard" element={<Leaderboard />} />
             <Route path="groups" element={<StudyGroups />} />
-            <Route path="forum" element={<Forum />} />
-            <Route path="forum/:id" element={<ForumPost />} />
             <Route path="timetable" element={<ProtectedRoute><Timetable /></ProtectedRoute>} />
             <Route path="syllabus" element={<ProtectedRoute><SyllabusTracker /></ProtectedRoute>} />
             <Route path="user/:id" element={<UserProfile />} />
