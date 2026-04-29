@@ -8,10 +8,10 @@ import { Link, useNavigate } from 'react-router-dom';
 const PLACEHOLDER = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=400';
 
 export default function BookExchange() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
-  const [tab, setTab] = useState('browse'); // 'browse' | 'requests'
+  const [tab, setTab] = useState('browse'); // 'browse' | 'requests' | 'my-requests'
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [subjectFilter, setSubjectFilter] = useState('');
@@ -26,6 +26,7 @@ export default function BookExchange() {
   const [listCoverPreview, setListCoverPreview] = useState('');
   const [actionId, setActionId] = useState(null);
   const [myRequests, setMyRequests] = useState([]);
+  const [myOutgoingRequests, setMyOutgoingRequests] = useState([]);
   const [reqLoading, setReqLoading] = useState(false);
 
   async function loadBooks() {
@@ -52,8 +53,12 @@ export default function BookExchange() {
     if (!isAuthenticated) return;
     setReqLoading(true);
     try {
-      const res = await apiFetch('/api/books/my-requests');
-      if (res.success) setMyRequests(res.data);
+      const [incomingRes, outgoingRes] = await Promise.all([
+        apiFetch('/api/books/my-requests'),
+        apiFetch('/api/books/my-outgoing-requests')
+      ]);
+      if (incomingRes.success) setMyRequests(incomingRes.data);
+      if (outgoingRes.success) setMyOutgoingRequests(outgoingRes.data);
     } catch (err) {
       console.error('Failed to load requests:', err.message);
     } finally {
@@ -70,6 +75,19 @@ export default function BookExchange() {
     const matchesStatus = filterStatus === 'All' || book.Status === filterStatus;
     return matchesSearch && matchesStatus;
   });
+
+  async function cancelRequest(reqId) {
+    setActionId(reqId);
+    try {
+      await apiFetch(`/api/books/cancel-request/${reqId}`, { method: 'DELETE' });
+      await Promise.all([loadBooks(), loadMyRequests()]);
+      toast('Request cancelled successfully!');
+    } catch (err) {
+      toast(err.message || 'Failed to cancel request', 'error');
+    } finally {
+      setActionId(null);
+    }
+  }
 
   async function handleListBook(e) {
     e.preventDefault();
@@ -144,14 +162,27 @@ export default function BookExchange() {
           </div>
           <div className="flex gap-2">
             {isAuthenticated && (
-              <button
-                type="button"
-                onClick={() => { setTab(tab === 'requests' ? 'browse' : 'requests'); loadMyRequests(); }}
-                className="flex items-center gap-2 border border-parchment-300 bg-white text-ink-800 px-4 py-2.5 rounded-lg font-medium hover:bg-parchment-50 transition-colors"
-              >
-                <Bell className="h-4 w-4" />
-                Requests {myRequests.length > 0 && <span className="bg-accent-primary text-white text-xs rounded-full px-1.5">{myRequests.filter(r => r.Status === 'Pending').length}</span>}
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => { setTab(tab === 'requests' ? 'browse' : 'requests'); loadMyRequests(); }}
+                  className={`flex items-center gap-2 border border-parchment-300 px-4 py-2.5 rounded-lg font-medium transition-colors ${
+                    tab === 'requests' ? 'bg-accent-primary text-white' : 'bg-white text-ink-800 hover:bg-parchment-50'
+                  }`}
+                >
+                  <Bell className="h-4 w-4" />
+                  Incoming {myRequests.length > 0 && <span className="bg-red-500 text-white text-xs rounded-full px-1.5">{myRequests.filter(r => r.Status === 'Pending').length}</span>}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setTab(tab === 'my-requests' ? 'browse' : 'my-requests'); loadMyRequests(); }}
+                  className={`flex items-center gap-2 border border-parchment-300 px-4 py-2.5 rounded-lg font-medium transition-colors ${
+                    tab === 'my-requests' ? 'bg-accent-primary text-white' : 'bg-white text-ink-800 hover:bg-parchment-50'
+                  }`}
+                >
+                  My Requests {myOutgoingRequests.length > 0 && <span className="bg-blue-500 text-white text-xs rounded-full px-1.5">{myOutgoingRequests.filter(r => r.Status === 'Pending').length}</span>}
+                </button>
+              </>
             )}
             <button
               type="button"
@@ -167,6 +198,67 @@ export default function BookExchange() {
           <div className="mb-4 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-sm flex justify-between gap-4">
             <span>{error}</span>
             {!isAuthenticated && <Link to="/auth" className="font-medium text-accent-primary shrink-0">Log in</Link>}
+          </div>
+        )}
+
+        {tab === 'my-requests' && (
+          <div className="bg-white rounded-xl shadow-sm border border-parchment-200 mb-8 overflow-hidden">
+            <div className="p-5 border-b border-parchment-200 bg-parchment-50 flex justify-between items-center">
+              <h2 className="font-bold text-ink-900">My outgoing requests</h2>
+              <button type="button" onClick={() => setTab('browse')} className="text-sm text-accent-primary">Back to browse</button>
+            </div>
+            {reqLoading ? (
+              <p className="p-6 text-ink-800 text-sm">Loading…</p>
+            ) : myOutgoingRequests.length === 0 ? (
+              <p className="p-6 text-ink-800 text-sm">No outgoing requests yet.</p>
+            ) : (
+              <div className="divide-y divide-parchment-200">
+                {myOutgoingRequests.map((req) => (
+                  <div key={req._id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <p className="font-semibold text-ink-900">{req.BookID?.Title}</p>
+                      <p className="text-sm text-ink-800">
+                        Requested from {req.BookID?.OwnerID?._id ? (
+                          <Link to={`/user/${req.BookID.OwnerID._id}`} className="font-medium hover:text-accent-primary hover:underline">
+                            {req.BookID.OwnerID.Name}
+                          </Link>
+                        ) : (
+                          <span className="font-medium">{req.BookID?.OwnerID?.Name}</span>
+                        )} · {req.BookID?.OwnerID?.Email}
+                      </p>
+                      <span className={`inline-block mt-1 px-2 py-0.5 text-xs font-semibold rounded-full ${
+                        req.Status === 'Pending' ? 'bg-amber-100 text-amber-800' :
+                        req.Status === 'Accepted' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                      }`}>{req.Status}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      {req.Status === 'Pending' && (
+                        <button
+                          type="button"
+                          disabled={actionId === req._id}
+                          onClick={() => cancelRequest(req._id)}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-sm font-medium hover:bg-rose-100 disabled:opacity-50"
+                        >
+                          <XCircle className="h-4 w-4" /> Cancel
+                        </button>
+                      )}
+                      {req.Status === 'Accepted' && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const res = await apiFetch(`/api/chat/conversations/request/${req._id}`);
+                            if (res.success) navigate(`/chat/${res.data._id}`);
+                          }}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-accent-primary border border-indigo-200 rounded-lg text-sm font-medium hover:bg-indigo-100"
+                        >
+                          <MessageCircle className="h-4 w-4" /> Chat
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -186,7 +278,15 @@ export default function BookExchange() {
                   <div key={req._id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                       <p className="font-semibold text-ink-900">{req.BookID?.Title}</p>
-                      <p className="text-sm text-ink-800">Requested by <span className="font-medium">{req.RequesterID?.Name}</span> · {req.RequesterID?.Email}</p>
+                      <p className="text-sm text-ink-800">
+                        Requested by {req.RequesterID?._id ? (
+                          <Link to={`/user/${req.RequesterID._id}`} className="font-medium hover:text-accent-primary hover:underline">
+                            {req.RequesterID.Name}
+                          </Link>
+                        ) : (
+                          <span className="font-medium">{req.RequesterID?.Name}</span>
+                        )} · {req.RequesterID?.Email}
+                      </p>
                       <span className={`inline-block mt-1 px-2 py-0.5 text-xs font-semibold rounded-full ${
                         req.Status === 'Pending' ? 'bg-amber-100 text-amber-800' :
                         req.Status === 'Accepted' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
@@ -231,125 +331,144 @@ export default function BookExchange() {
           </div>
         )}
 
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-parchment-200 mb-8 flex flex-col lg:flex-row gap-4 justify-between items-center">
+        {(tab === 'browse' || tab === 'requests' || tab === 'my-requests') && (
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-parchment-200 mb-8 flex flex-col lg:flex-row gap-4 justify-between items-center">
 
-          <div className="relative w-full lg:w-96">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-5 w-5 text-slate-400" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search by title or author..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="block w-full pl-10 pr-3 py-2.5 border border-parchment-300 rounded-lg bg-parchment-50 hover:bg-white focus:bg-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
-            <div className="flex items-center gap-2 text-sm">
-              <Filter className="h-4 w-4 text-ink-800" />
-              <span className="font-medium text-ink-800">Status:</span>
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="border-parchment-300 rounded-md shadow-sm py-1.5 pl-3 pr-8 focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                <option value="All">All Books</option>
-                <option value="Available">Available</option>
-                <option value="Requested">Requested</option>
-                <option value="Exchanged">Exchanged</option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-2 text-sm">
-              <span className="font-medium text-ink-800">Subject:</span>
-              <select
-                value={subjectFilter}
-                onChange={(e) => setSubjectFilter(e.target.value)}
-                className="border-parchment-300 rounded-md shadow-sm py-1.5 pl-3 pr-8 focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                <option value="">All Subjects</option>
-                <option value="Computer Science">Computer Science</option>
-                <option value="Physics">Physics</option>
-                <option value="Mathematics">Mathematics</option>
-                <option value="Economics">Economics</option>
-                <option value="Chemistry">Chemistry</option>
-                <option value="Biology">Biology</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {loading && <p className="text-ink-800 mb-4">Loading books…</p>}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredBooks.map((book) => {
-            const owner = book.OwnerID?.Name || 'Student';
-            const busy = actionId === book._id;
-            return (
-              <div key={book._id} className="bg-white rounded-xl shadow-sm border border-parchment-200 overflow-hidden hover:shadow-lg transition-all group flex flex-col">
-
-                <div className="relative h-52 w-full bg-parchment-100 flex items-center justify-center overflow-hidden border-b border-parchment-200">
-                  <div className="absolute top-3 right-3 z-10 flex gap-2">
-                    <span
-                      className={`px-2.5 py-1 text-xs font-bold rounded-full shadow-sm ${
-                        book.Status === 'Available' ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'
-                      }`}
-                    >
-                      {book.Status}
-                    </span>
-                  </div>
-                  <img
-                    src={book.CoverImage ? fileUrl(book.CoverImage) : PLACEHOLDER}
-                    alt=""
-                    className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                </div>
-
-                <div className="p-3 flex-1 flex flex-col">
-                  <p className="text-xs font-semibold text-accent-primary mb-1 tracking-wide uppercase">{book.Subject}</p>
-                  <h3 className="text-lg font-bold text-ink-900 mb-1 line-clamp-2" title={book.Title}>{book.Title}</h3>
-                  <p className="text-sm text-ink-800 mb-4">{book.Author}</p>
-
-                  <div className="mt-auto space-y-3">
-                    <div className="flex items-center gap-2 text-sm text-ink-800">
-                      <MapPin className="h-4 w-4 text-slate-400" />
-                      <span className="truncate">Campus meetup (coordinate with owner)</span>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-3 border-t border-parchment-200">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-accent-primary font-bold text-xs">
-                          {owner.charAt(0)}
-                        </div>
-                        <span className="text-sm font-medium text-ink-800">{owner}</span>
-                      </div>
-                      {book.Status === 'Available' ? (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => requestBook(book._id)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-accent-primary hover:bg-indigo-100 rounded-md font-medium text-sm transition-colors disabled:opacity-50"
-                        >
-                          <MessageCircle className="h-4 w-4" /> {busy ? '…' : 'Request'}
-                        </button>
-                      ) : (
-                        <button type="button" disabled className="flex items-center gap-1.5 px-3 py-1.5 bg-parchment-100 text-slate-400 rounded-md font-medium text-sm cursor-not-allowed">
-                          <MessageCircle className="h-4 w-4" /> Unavailable
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
+            <div className="relative w-full lg:w-96">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-slate-400" />
               </div>
-            );
-          })}
-        </div>
+              <input
+                type="text"
+                placeholder="Search by title or author..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="block w-full pl-10 pr-3 py-2.5 border border-parchment-300 rounded-lg bg-parchment-50 hover:bg-white focus:bg-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
+              <div className="flex items-center gap-2 text-sm">
+                <Filter className="h-4 w-4 text-ink-800" />
+                <span className="font-medium text-ink-800">Status:</span>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="border-parchment-300 rounded-md shadow-sm py-1.5 pl-3 pr-8 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="All">All Books</option>
+                  <option value="Available">Available</option>
+                  <option value="Requested">Requested</option>
+                  <option value="Exchanged">Exchanged</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 text-sm">
+                <span className="font-medium text-ink-800">Subject:</span>
+                <select
+                  value={subjectFilter}
+                  onChange={(e) => setSubjectFilter(e.target.value)}
+                  className="border-parchment-300 rounded-md shadow-sm py-1.5 pl-3 pr-8 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="">All Subjects</option>
+                  <option value="Computer Science">Computer Science</option>
+                  <option value="Physics">Physics</option>
+                  <option value="Mathematics">Mathematics</option>
+                  <option value="Economics">Economics</option>
+                  <option value="Chemistry">Chemistry</option>
+                  <option value="Biology">Biology</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {loading && tab === 'browse' && <p className="text-ink-800 mb-4">Loading books…</p>}
+
+        {tab === 'browse' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {filteredBooks.map((book) => {
+              const owner = book.OwnerID?.Name || 'Student';
+              const busy = actionId === book._id;
+              const isMyBook = book.OwnerID?._id === user?._id;
+              const hasRequested = myOutgoingRequests.some(req => req.BookID?._id === book._id && req.Status === 'Pending');
+              
+              return (
+                <div key={book._id} className="bg-white rounded-xl shadow-sm border border-parchment-200 overflow-hidden hover:shadow-lg transition-all group flex flex-col">
+
+                  <div className="relative h-52 w-full bg-parchment-100 flex items-center justify-center overflow-hidden border-b border-parchment-200">
+                    <div className="absolute top-3 right-3 z-10 flex gap-2">
+                      <span
+                        className={`px-2.5 py-1 text-xs font-bold rounded-full shadow-sm ${
+                          book.Status === 'Available' ? 'bg-emerald-500 text-white' : 
+                          book.Status === 'Requested' ? 'bg-amber-500 text-white' :
+                          'bg-slate-500 text-white'
+                        }`}
+                      >
+                        {book.Status}
+                      </span>
+                    </div>
+                    <img
+                      src={book.CoverImage ? fileUrl(book.CoverImage) : PLACEHOLDER}
+                      alt=""
+                      className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
+
+                  <div className="p-3 flex-1 flex flex-col">
+                    <p className="text-xs font-semibold text-accent-primary mb-1 tracking-wide uppercase">{book.Subject}</p>
+                    <h3 className="text-lg font-bold text-ink-900 mb-1 line-clamp-2" title={book.Title}>{book.Title}</h3>
+                    <p className="text-sm text-ink-800 mb-4">{book.Author}</p>
+
+                    <div className="mt-auto space-y-3">
+                      <div className="flex items-center gap-2 text-sm text-ink-800">
+                        <MapPin className="h-4 w-4 text-slate-400" />
+                        <span className="truncate">Campus meetup (coordinate with owner)</span>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-3 border-t border-parchment-200">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-accent-primary font-bold text-xs">
+                            {owner.charAt(0)}
+                          </div>
+                          {book.OwnerID?._id ? (
+                            <Link to={`/user/${book.OwnerID._id}`} className="text-sm font-medium text-ink-800 hover:text-accent-primary hover:underline">
+                              {owner}
+                            </Link>
+                          ) : (
+                            <span className="text-sm font-medium text-ink-800">{owner}</span>
+                          )}
+                        </div>
+                        {isMyBook ? (
+                          <span className="text-xs text-slate-500 px-3 py-1.5 bg-slate-100 rounded-md">Your book</span>
+                        ) : hasRequested ? (
+                          <span className="text-xs text-amber-700 px-3 py-1.5 bg-amber-100 rounded-md font-medium">Requested</span>
+                        ) : book.Status === 'Available' ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => requestBook(book._id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-accent-primary hover:bg-indigo-100 rounded-md font-medium text-sm transition-colors disabled:opacity-50"
+                          >
+                            <MessageCircle className="h-4 w-4" /> {busy ? '…' : 'Request'}
+                          </button>
+                        ) : (
+                          <button type="button" disabled className="flex items-center gap-1.5 px-3 py-1.5 bg-parchment-100 text-slate-400 rounded-md font-medium text-sm cursor-not-allowed">
+                            <MessageCircle className="h-4 w-4" /> Unavailable
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {listOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 overflow-y-auto">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 my-8 max-h-[90vh] overflow-y-auto">
               <h2 className="text-lg font-bold text-ink-900 mb-4">List a book</h2>
               <form onSubmit={handleListBook} className="space-y-4">
                 <div>
@@ -412,11 +531,11 @@ export default function BookExchange() {
                   </div>
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
-                  <button type="button" onClick={() => setListOpen(false)} className="px-4 py-2 border rounded-lg">Cancel</button>
+                  <button type="button" onClick={() => setListOpen(false)} className="px-4 py-2 border border-parchment-300 rounded-lg text-ink-800 hover:bg-parchment-50">Cancel</button>
                   <button
                     type="submit"
                     disabled={actionId === 'list'}
-                    className="px-4 py-2 bg-accent-primary text-white rounded-lg disabled:opacity-50"
+                    className="px-4 py-2 bg-accent-primary text-white rounded-lg disabled:opacity-50 hover:bg-accent-hover"
                   >
                     {actionId === 'list' ? 'Saving…' : 'Publish listing'}
                   </button>

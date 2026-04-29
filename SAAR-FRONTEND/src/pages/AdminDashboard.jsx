@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Shield, Users, Flag, Activity, Trash2, RefreshCw, BookOpen, ArrowLeftRight } from 'lucide-react';
-import { apiFetch } from '../lib/api';
+import { Shield, Users, Flag, Activity, Trash2, RefreshCw, BookOpen, ArrowLeftRight, Edit2, Check, X, UserCircle, Camera } from 'lucide-react';
+import { apiFetch, fileUrl } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import {
   Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale,
   LinearScale, BarElement, Title
@@ -16,6 +18,8 @@ const COLORS = [
 ];
 
 export default function AdminDashboard() {
+  const { user, updateUser } = useAuth();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
@@ -25,6 +29,22 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(null);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({ Name: '', Bio: '', Branch: '', Year: '' });
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
+
+  useEffect(() => {
+    if (user) {
+      setProfileForm({ 
+        Name: user.Name || '', 
+        Bio: user.Bio || '', 
+        Branch: user.Branch || '', 
+        Year: user.Year || '' 
+      });
+    }
+  }, [user]);
 
   async function loadAll() {
     setError('');
@@ -58,6 +78,38 @@ export default function AdminDashboard() {
     setDeleting(id);
     try { await apiFetch(`/api/admin/books/${id}`, { method: 'DELETE' }); setBooks((p) => p.filter((b) => b._id !== id)); }
     catch (e) { setError(e.message); } finally { setDeleting(null); }
+  }
+
+  function handleAvatarChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  }
+
+  async function saveAdminProfile(e) {
+    e.preventDefault();
+    setSavingProfile(true);
+    try {
+      const fd = new FormData();
+      Object.entries(profileForm).forEach(([k, v]) => v !== undefined && fd.append(k, v));
+      if (avatarFile) fd.append('avatar', avatarFile);
+      
+      const res = await apiFetch('/api/auth/profile', { method: 'PATCH', body: fd });
+      if (res.success) {
+        updateUser(res.data);
+        toast('Profile updated successfully!');
+        setEditingProfile(false);
+        setAvatarFile(null);
+        setAvatarPreview(null);
+      } else {
+        throw new Error(res.message || 'Update failed');
+      }
+    } catch (err) {
+      toast(err.message || 'Update failed', 'error');
+    } finally {
+      setSavingProfile(false);
+    }
   }
 
   // ── Chart data ──
@@ -127,6 +179,7 @@ export default function AdminDashboard() {
 
   const navItems = [
     { key: 'overview',   label: 'Overview',            icon: Activity      },
+    { key: 'profile',    label: 'My Profile',          icon: UserCircle    },
     { key: 'notes',      label: 'Notes moderation',    icon: Flag          },
     { key: 'books',      label: 'Books moderation',    icon: BookOpen      },
     { key: 'exchanges',  label: 'Completed Exchanges', icon: ArrowLeftRight },
@@ -229,6 +282,109 @@ export default function AdminDashboard() {
               </ul>
             </div>
           </>
+        )}
+
+        {/* Profile */}
+        {activeTab === 'profile' && (
+          <div className="bg-white rounded-xl shadow-sm border border-parchment-200 p-8">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+              <div className="relative shrink-0">
+                <div className="w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center overflow-hidden">
+                  {(avatarPreview || (user?.Avatar ? fileUrl(user.Avatar) : null)) ? (
+                    <img 
+                      src={avatarPreview || fileUrl(user.Avatar)} 
+                      alt="avatar" 
+                      className="w-full h-full object-cover" 
+                      onError={(e) => e.target.style.display = 'none'}
+                    />
+                  ) : (
+                    <UserCircle className="h-12 w-12 text-accent-primary" />
+                  )}
+                </div>
+                {editingProfile && (
+                  <>
+                    <button type="button" onClick={() => document.getElementById('admin-avatar').click()}
+                      className="absolute bottom-0 right-0 bg-accent-primary text-white rounded-full p-1 shadow">
+                      <Camera className="h-3.5 w-3.5" />
+                    </button>
+                    <input id="admin-avatar" type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+                  </>
+                )}
+              </div>
+
+              <div className="flex-1 min-w-0">
+                {editingProfile ? (
+                  <form onSubmit={saveAdminProfile} className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <input 
+                        value={profileForm.Name} 
+                        onChange={(e) => setProfileForm(f => ({ ...f, Name: e.target.value }))}
+                        className="border border-parchment-300 rounded-lg px-3 py-2 text-ink-900 text-sm" 
+                        placeholder="Name" 
+                        required 
+                      />
+                      <select 
+                        value={profileForm.Branch} 
+                        onChange={(e) => setProfileForm(f => ({ ...f, Branch: e.target.value }))}
+                        className="border border-parchment-300 rounded-lg px-3 py-2 text-ink-800 text-sm"
+                      >
+                        <option value="">Select branch</option>
+                        {['Computer Science', 'Electronics', 'Mechanical', 'Civil', 'Chemical', 'Electrical', 'Other'].map(b => 
+                          <option key={b} value={b}>{b}</option>
+                        )}
+                      </select>
+                      <select 
+                        value={profileForm.Year} 
+                        onChange={(e) => setProfileForm(f => ({ ...f, Year: e.target.value }))}
+                        className="border border-parchment-300 rounded-lg px-3 py-2 text-ink-800 text-sm"
+                      >
+                        <option value="">Select year</option>
+                        {[1, 2, 3, 4, 5, 6].map(y => <option key={y} value={y}>Year {y}</option>)}
+                      </select>
+                    </div>
+                    <textarea 
+                      value={profileForm.Bio} 
+                      onChange={(e) => setProfileForm(f => ({ ...f, Bio: e.target.value }))}
+                      className="w-full border border-parchment-300 rounded-lg px-3 py-2 text-ink-800 text-sm resize-none"
+                      placeholder="Short bio (optional)" 
+                      rows={2} 
+                      maxLength={300} 
+                    />
+                    <div className="flex gap-2">
+                      <button type="submit" disabled={savingProfile} 
+                        className="flex items-center gap-1 px-4 py-2 bg-accent-primary text-white rounded-lg text-sm font-medium disabled:opacity-50">
+                        <Check className="h-4 w-4" /> {savingProfile ? 'Saving…' : 'Save'}
+                      </button>
+                      <button type="button" 
+                        onClick={() => { setEditingProfile(false); setAvatarPreview(null); setAvatarFile(null); }}
+                        className="flex items-center gap-1 px-4 py-2 border border-parchment-300 rounded-lg text-sm text-ink-800">
+                        <X className="h-4 w-4" /> Cancel
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <h1 className="text-2xl font-bold text-ink-900">{user?.Name}</h1>
+                      <button type="button" onClick={() => setEditingProfile(true)} 
+                        className="text-slate-400 hover:text-accent-primary">
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-3 mt-2 text-sm text-ink-800">
+                      <span>{user?.Email}</span>
+                      {user?.Branch && <span className="text-xs bg-parchment-100 px-2 py-0.5 rounded-full">{user.Branch}</span>}
+                      {user?.Year && <span className="text-xs bg-parchment-100 px-2 py-0.5 rounded-full">Year {user.Year}</span>}
+                    </div>
+                    {user?.Bio && <p className="text-sm text-ink-800 mt-2 italic">"{user.Bio}"</p>}
+                    <span className="inline-block mt-3 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-accent-primary">
+                      {user?.Role}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Notes moderation */}

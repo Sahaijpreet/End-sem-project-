@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { UserCircle, FileText, BookOpen, Mail, IdCard, Edit2, Check, X, ArrowLeftRight, Bookmark, Camera, Download, ExternalLink } from 'lucide-react';
+import { UserCircle, FileText, BookOpen, Mail, IdCard, Edit2, Check, X, ArrowLeftRight, Bookmark, Camera, Download, ExternalLink, Users } from 'lucide-react';
 import { apiFetch, fileUrl } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useReveal } from '../hooks/useReveal';
+import { Link } from 'react-router-dom';
 
-const TABS = ['Overview', 'Bookmarks', 'Exchange History'];
+const TABS = ['Overview', 'Social', 'Bookmarks', 'Exchange History'];
 const BRANCHES = ['Computer Science', 'Electronics', 'Mechanical', 'Civil', 'Chemical', 'Electrical', 'Other'];
 
 export default function Profile() {
@@ -23,6 +24,12 @@ export default function Profile() {
   const [form, setForm] = useState({ Name: '', CollegeID: '', Bio: '', Branch: '', Year: '' });
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [avatarFile, setAvatarFile] = useState(null);
+  const [followers, setFollowers] = useState([]);
+  const [following, setFollowing] = useState([]);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [loadingFollowers, setLoadingFollowers] = useState(false);
+  const [loadingFollowing, setLoadingFollowing] = useState(false);
 
   useEffect(() => {
     if (user) setForm({ Name: user.Name || '', CollegeID: user.CollegeID || '', Bio: user.Bio || '', Branch: user.Branch || '', Year: user.Year || '' });
@@ -41,7 +48,13 @@ export default function Profile() {
       setBooks(bRes.success && Array.isArray(bRes.data) ? bRes.data : []);
       setExchanges(cRes.success ? cRes.data.filter((c) => c.ExchangeCompleted) : []);
       setBookmarks(bmRes.success ? bmRes.data : { notes: [], pyqs: [] });
+    }).catch((error) => {
+      console.error('Failed to load profile data:', error);
     }).finally(() => { if (!cancelled) setLoading(false); });
+    
+    // Load social counts
+    loadSocialCounts();
+    
     return () => { cancelled = true; };
   }, []);
 
@@ -57,6 +70,45 @@ export default function Profile() {
     return books.filter((b) => (typeof b.OwnerID === 'object' ? String(b.OwnerID._id) : String(b.OwnerID)) === String(uid));
   }, [books, user]);
 
+  async function loadSocialCounts() {
+    if (!user?._id) return;
+    try {
+      const r = await apiFetch(`/api/users/${user._id}`);
+      if (r.success) {
+        setFollowersCount(r.data.followersCount || 0);
+        setFollowingCount(r.data.followingCount || 0);
+      }
+    } catch (e) {
+      console.error('Failed to load social counts:', e.message);
+    }
+  }
+
+  async function loadFollowers() {
+    if (!user?._id || loadingFollowers || followers.length > 0) return;
+    setLoadingFollowers(true);
+    try {
+      const r = await apiFetch(`/api/users/${user._id}/followers`);
+      if (r.success) setFollowers(r.data);
+    } catch (e) {
+      console.error('Failed to load followers:', e.message);
+    } finally {
+      setLoadingFollowers(false);
+    }
+  }
+
+  async function loadFollowing() {
+    if (!user?._id || loadingFollowing || following.length > 0) return;
+    setLoadingFollowing(true);
+    try {
+      const r = await apiFetch(`/api/users/${user._id}/following`);
+      if (r.success) setFollowing(r.data);
+    } catch (e) {
+      console.error('Failed to load following:', e.message);
+    } finally {
+      setLoadingFollowing(false);
+    }
+  }
+
   function handleAvatarChange(e) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -71,13 +123,36 @@ export default function Profile() {
       const fd = new FormData();
       Object.entries(form).forEach(([k, v]) => v !== undefined && fd.append(k, v));
       if (avatarFile) fd.append('avatar', avatarFile);
+      
+      console.log('Saving profile with avatar file:', avatarFile);
+      
       const res = await apiFetch('/api/auth/profile', { method: 'PATCH', body: fd });
-      if (res.success) updateUser(res.data);
-      toast('Profile updated!');
-      setEditing(false);
-      setAvatarFile(null);
-      setAvatarPreview(null);
+      console.log('Profile save response:', res);
+      
+      if (res.success) {
+        // Update user data with server response
+        updateUser(res.data);
+        
+        // Also fetch fresh user data to ensure avatar is loaded
+        try {
+          const userRes = await apiFetch('/api/auth/me');
+          if (userRes.success) {
+            console.log('Fresh user data:', userRes.data);
+            updateUser(userRes.data);
+          }
+        } catch (e) {
+          console.error('Failed to fetch fresh user data:', e);
+        }
+        
+        toast('Profile updated successfully!');
+        setEditing(false);
+        setAvatarFile(null);
+        setAvatarPreview(null);
+      } else {
+        throw new Error(res.message || 'Update failed');
+      }
     } catch (err) {
+      console.error('Profile save error:', err);
       toast(err.message || 'Update failed', 'error');
     } finally {
       setSaving(false);
@@ -87,6 +162,15 @@ export default function Profile() {
   useReveal();
 
   const avatarSrc = avatarPreview || (user?.Avatar ? fileUrl(user.Avatar) : null);
+  
+  // Debug logging
+  console.log('Profile Debug:', {
+    user: user,
+    userAvatar: user?.Avatar,
+    avatarPreview: avatarPreview,
+    avatarSrc: avatarSrc,
+    fileUrlResult: user?.Avatar ? fileUrl(user.Avatar) : 'no avatar'
+  });
 
   return (
     <div className="flex-1 min-h-[calc(100vh-4rem)] relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #fbf8f1 0%, #f4ebd8 40%, #fbf8f1 100%)' }}>
@@ -109,7 +193,16 @@ export default function Profile() {
             <div className="relative shrink-0">
               <div className="w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center overflow-hidden">
                 {avatarSrc ? (
-                  <img src={avatarSrc} alt="avatar" className="w-full h-full object-cover" />
+                  <img 
+                    src={avatarSrc} 
+                    alt="avatar" 
+                    className="w-full h-full object-cover" 
+                    onError={(e) => {
+                      console.error('Avatar image failed to load:', avatarSrc);
+                      e.target.style.display = 'none';
+                    }}
+                    onLoad={() => console.log('Avatar image loaded successfully:', avatarSrc)}
+                  />
                 ) : (
                   <UserCircle className="h-12 w-12 text-accent-primary" />
                 )}
@@ -172,6 +265,10 @@ export default function Profile() {
                     {user?.Year && <span className="text-xs bg-parchment-100 px-2 py-0.5 rounded-full">Year {user.Year}</span>}
                   </div>
                   {user?.Bio && <p className="text-sm text-ink-800 mt-2 italic">"{user.Bio}"</p>}
+                  <div className="flex gap-4 mt-3 text-sm text-ink-800">
+                    <span><strong className="text-ink-900">{followersCount}</strong> followers</span>
+                    <span><strong className="text-ink-900">{followingCount}</strong> following</span>
+                  </div>
                   <span className={`inline-block mt-3 px-2.5 py-0.5 text-xs font-semibold rounded-full ${user?.Role === 'Admin' ? 'bg-indigo-100 text-accent-primary' : 'bg-parchment-100 text-ink-900'}`}>
                     {user?.Role}
                   </span>
@@ -241,6 +338,92 @@ export default function Profile() {
                   </span>
                 </div>
               )} />
+          </div>
+        )}
+
+        {tab === 'Social' && (
+          <div className="space-y-6">
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="bg-white rounded-xl border border-parchment-200 overflow-hidden">
+                <div className="px-6 py-4 border-b border-parchment-200 flex items-center justify-between">
+                  <h2 className="font-bold text-ink-900 flex items-center gap-2">
+                    <Users className="h-5 w-5 text-accent-primary" /> Followers ({followersCount})
+                  </h2>
+                  <button 
+                    onClick={loadFollowers}
+                    className="text-sm text-accent-primary hover:underline"
+                  >
+                    {followers.length > 0 ? 'Refresh' : 'Load'}
+                  </button>
+                </div>
+                <div className="divide-y divide-parchment-100 max-h-96 overflow-y-auto">
+                  {loadingFollowers ? (
+                    <p className="p-6 text-sm text-ink-800">Loading followers...</p>
+                  ) : followers.length === 0 ? (
+                    <p className="p-6 text-sm text-ink-800">No followers yet.</p>
+                  ) : followers.map((follower) => (
+                    <div key={follower._id} className="px-6 py-4 flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center overflow-hidden shrink-0">
+                        {follower.Avatar ? (
+                          <img src={fileUrl(follower.Avatar)} alt={follower.Name} className="w-full h-full object-cover" />
+                        ) : (
+                          <UserCircle className="h-7 w-7 text-accent-primary" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <Link to={`/user/${follower._id}`} className="font-medium text-ink-900 hover:text-accent-primary hover:underline block truncate">
+                          {follower.Name}
+                        </Link>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {follower.Branch && <span className="text-xs bg-parchment-100 text-ink-800 px-2 py-0.5 rounded-full">{follower.Branch}</span>}
+                          {follower.Year && <span className="text-xs bg-parchment-100 text-ink-800 px-2 py-0.5 rounded-full">Year {follower.Year}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl border border-parchment-200 overflow-hidden">
+                <div className="px-6 py-4 border-b border-parchment-200 flex items-center justify-between">
+                  <h2 className="font-bold text-ink-900 flex items-center gap-2">
+                    <Users className="h-5 w-5 text-accent-primary" /> Following ({followingCount})
+                  </h2>
+                  <button 
+                    onClick={loadFollowing}
+                    className="text-sm text-accent-primary hover:underline"
+                  >
+                    {following.length > 0 ? 'Refresh' : 'Load'}
+                  </button>
+                </div>
+                <div className="divide-y divide-parchment-100 max-h-96 overflow-y-auto">
+                  {loadingFollowing ? (
+                    <p className="p-6 text-sm text-ink-800">Loading following...</p>
+                  ) : following.length === 0 ? (
+                    <p className="p-6 text-sm text-ink-800">Not following anyone yet.</p>
+                  ) : following.map((followedUser) => (
+                    <div key={followedUser._id} className="px-6 py-4 flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center overflow-hidden shrink-0">
+                        {followedUser.Avatar ? (
+                          <img src={fileUrl(followedUser.Avatar)} alt={followedUser.Name} className="w-full h-full object-cover" />
+                        ) : (
+                          <UserCircle className="h-7 w-7 text-accent-primary" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <Link to={`/user/${followedUser._id}`} className="font-medium text-ink-900 hover:text-accent-primary hover:underline block truncate">
+                          {followedUser.Name}
+                        </Link>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {followedUser.Branch && <span className="text-xs bg-parchment-100 text-ink-800 px-2 py-0.5 rounded-full">{followedUser.Branch}</span>}
+                          {followedUser.Year && <span className="text-xs bg-parchment-100 text-ink-800 px-2 py-0.5 rounded-full">Year {followedUser.Year}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

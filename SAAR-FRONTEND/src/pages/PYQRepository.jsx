@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Search, Filter, ChevronDown, BookMarked, UploadCloud, X, File, Download, Bookmark, BookmarkCheck, MessageSquare } from 'lucide-react';
 import { apiFetch, fileUrl } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
@@ -249,7 +250,15 @@ export default function PYQRepository() {
                     <span>·</span>
                     <span>{pyq.Year}</span>
                   </div>
-                  <p className="text-xs text-ink-800 mt-3">By {pyq.UploaderID?.Name || 'Student'}</p>
+                  <p className="text-xs text-ink-800 mt-3">
+                    By {pyq.UploaderID?._id ? (
+                      <Link to={`/user/${pyq.UploaderID._id}`} className="hover:text-accent-primary hover:underline font-medium">
+                        {pyq.UploaderID.Name || 'Student'}
+                      </Link>
+                    ) : (
+                      'Student'
+                    )}
+                  </p>
                 </div>
                 <div className="px-5 py-3">
                   <StarRating resourceType="PYQ" resourceId={pyq._id} />
@@ -258,22 +267,31 @@ export default function PYQRepository() {
                   </div>
                 </div>
                 <div className="bg-parchment-50 px-5 py-3 border-t border-parchment-200 flex gap-1.5 flex-wrap">
-                  <button onClick={() => handleDownload(pyq._id, fileUrl(pyq.FileURL))}
-                    className="flex-1 flex items-center justify-center gap-2 py-2 px-4 text-sm font-medium rounded-lg text-white bg-accent-primary hover:bg-accent-hover transition-colors">
-                    <Download className="h-4 w-4" /> Open
-                  </button>
-                  <button type="button" onClick={() => handleBookmark(pyq._id)}
-                    className={`flex items-center justify-center py-2 px-3 border rounded-lg text-sm transition-colors ${
-                      bookmarks.has(pyq._id) ? 'bg-violet-100 border-violet-300 text-violet-600' : 'border-parchment-300 text-ink-800 bg-white hover:bg-parchment-50'
-                    }`}>
-                    {bookmarks.has(pyq._id) ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
-                  </button>
-                  <button type="button" onClick={() => setActiveComment(activeComment === pyq._id ? null : pyq._id)}
-                    className="flex items-center justify-center py-2 px-3 border border-parchment-300 rounded-lg text-sm text-ink-800 bg-white hover:bg-parchment-50">
-                    <MessageSquare className="h-4 w-4" />
-                  </button>
+                  {isAuthenticated ? (
+                    <>
+                      <button onClick={() => handleDownload(pyq._id, fileUrl(pyq.FileURL))}
+                        className="flex-1 flex items-center justify-center gap-2 py-2 px-4 text-sm font-medium rounded-lg text-white bg-accent-primary hover:bg-accent-hover transition-colors">
+                        <Download className="h-4 w-4" /> Open
+                      </button>
+                      <button type="button" onClick={() => handleBookmark(pyq._id)}
+                        className={`flex items-center justify-center py-2 px-3 border rounded-lg text-sm transition-colors ${
+                          bookmarks.has(pyq._id) ? 'bg-violet-100 border-violet-300 text-violet-600' : 'border-parchment-300 text-ink-800 bg-white hover:bg-parchment-50'
+                        }`}>
+                        {bookmarks.has(pyq._id) ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
+                      </button>
+                      <button type="button" onClick={() => setActiveComment(activeComment === pyq._id ? null : pyq._id)}
+                        className="flex items-center justify-center py-2 px-3 border border-parchment-300 rounded-lg text-sm text-ink-800 bg-white hover:bg-parchment-50">
+                        <MessageSquare className="h-4 w-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <Link to="/auth" state={{ mode: 'login' }}
+                      className="flex-1 flex items-center justify-center gap-1 py-2 px-3 text-sm font-medium rounded-lg text-white bg-accent-primary hover:bg-accent-hover transition-colors">
+                      Login to Access
+                    </Link>
+                  )}
                 </div>
-                {activeComment === pyq._id && (
+                {activeComment === pyq._id && isAuthenticated && (
                   <div className="px-4 pb-4 border-t border-parchment-100">
                     <div className="flex justify-end pt-2">
                       <button onClick={() => setActiveComment(null)} className="text-slate-400 hover:text-ink-900"><X className="h-4 w-4" /></button>

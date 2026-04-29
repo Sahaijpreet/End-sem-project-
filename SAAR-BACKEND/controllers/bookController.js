@@ -19,7 +19,7 @@ export const getAvailableBooks = async (req, res) => {
   try {
     const { subject } = req.query;
     
-    let query = { Status: 'Available' };
+    let query = {};
     if (subject) query.Subject = subject;
 
     const books = await Book.find(query)
@@ -87,6 +87,63 @@ export const getMyRequests = async (req, res) => {
       .populate('RequesterID', 'Name Email')
       .sort('-createdAt');
     res.json({ success: true, data: requests });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getMyOutgoingRequests = async (req, res) => {
+  try {
+    // Requests I made on other people's books
+    const requests = await ExchangeRequest.find({ RequesterID: req.user._id })
+      .populate({
+        path: 'BookID',
+        select: 'Title Author Subject Status',
+        populate: {
+          path: 'OwnerID',
+          select: 'Name Email'
+        }
+      })
+      .sort('-createdAt');
+    res.json({ success: true, data: requests });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const cancelRequest = async (req, res) => {
+  try {
+    const request = await ExchangeRequest.findById(req.params.id).populate('BookID');
+    if (!request) {
+      return res.status(404).json({ success: false, message: 'Request not found' });
+    }
+    
+    // Only the requester can cancel their own request
+    if (request.RequesterID.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+    
+    // Only allow canceling pending requests
+    if (request.Status !== 'Pending') {
+      return res.status(400).json({ success: false, message: 'Can only cancel pending requests' });
+    }
+    
+    // Delete the request and update book status back to Available
+    await ExchangeRequest.findByIdAndDelete(req.params.id);
+    
+    // Check if there are other pending requests for this book
+    const otherRequests = await ExchangeRequest.find({ 
+      BookID: request.BookID._id, 
+      Status: 'Pending' 
+    });
+    
+    // If no other pending requests, set book back to Available
+    if (otherRequests.length === 0) {
+      request.BookID.Status = 'Available';
+      await request.BookID.save();
+    }
+    
+    res.json({ success: true, message: 'Request cancelled successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

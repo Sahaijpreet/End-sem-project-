@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { MessageSquare, Send, Trash2 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
@@ -83,7 +84,13 @@ export default function Comments({ resourceType, resourceId }) {
             <div key={c._id} className="bg-parchment-50 border border-parchment-200 rounded-lg p-3">
               <div className="flex justify-between items-start">
                 <div>
-                  <span className="text-sm font-semibold text-ink-900">{c.AuthorID?.Name || 'Student'}</span>
+                  {c.AuthorID?._id ? (
+                    <Link to={`/user/${c.AuthorID._id}`} className="text-sm font-semibold text-ink-900 hover:text-accent-primary hover:underline">
+                      {c.AuthorID.Name || 'Student'}
+                    </Link>
+                  ) : (
+                    <span className="text-sm font-semibold text-ink-900">Student</span>
+                  )}
                   <span className="text-xs text-slate-400 ml-2">{new Date(c.createdAt).toLocaleDateString()}</span>
                 </div>
                 {(user?._id === c.AuthorID?._id || user?.Role === 'Admin') && (

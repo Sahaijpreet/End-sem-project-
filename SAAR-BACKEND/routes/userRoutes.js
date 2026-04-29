@@ -19,9 +19,9 @@ const optionalAuth = async (req, res, next) => {
 
 const router = express.Router();
 
-router.get('/:id', optionalAuth, getPublicProfile);
+router.get('/:id', protect, getPublicProfile);
 router.post('/:id/follow', protect, toggleFollow);
-router.get('/:id/followers', getFollowers);
-router.get('/:id/following', getFollowing);
+router.get('/:id/followers', protect, getFollowers);
+router.get('/:id/following', protect, getFollowing);
 
 export default router;

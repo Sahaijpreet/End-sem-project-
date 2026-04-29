@@ -1,22 +1,51 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 
-const ThemeContext = createContext(null);
+const ThemeContext = createContext();
 
 export function ThemeProvider({ children }) {
-  const [dark, setDark] = useState(() => localStorage.getItem('saar_theme') === 'dark');
+  const [isDark, setIsDark] = useState(() => {
+    // Check localStorage first
+    const saved = localStorage.getItem('saar-theme');
+    if (saved) {
+      return saved === 'dark';
+    }
+    // Check system preference
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', dark);
-    localStorage.setItem('saar_theme', dark ? 'dark' : 'light');
-  }, [dark]);
+    // Update localStorage
+    localStorage.setItem('saar-theme', isDark ? 'dark' : 'light');
+    
+    // Update document class
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDark]);
+
+  const toggleTheme = () => {
+    setIsDark(!isDark);
+  };
+
+  const value = {
+    isDark,
+    toggleTheme,
+    theme: isDark ? 'dark' : 'light'
+  };
 
   return (
-    <ThemeContext.Provider value={{ dark, toggle: () => setDark((d) => !d) }}>
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   );
 }
 
 export function useTheme() {
-  return useContext(ThemeContext);
+  const context = useContext(ThemeContext);
+  if (!context) {
+    throw new Error('useTheme must be used within a ThemeProvider');
+  }
+  return context;
 }

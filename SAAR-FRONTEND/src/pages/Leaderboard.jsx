@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Trophy, Upload, ThumbsUp, Download, UserCircle, Star, Zap } from 'lucide-react';
 import { apiFetch, fileUrl } from '../lib/api';
 import { useReveal } from '../hooks/useReveal';
@@ -76,7 +77,7 @@ export default function Leaderboard() {
                       </div>
                     )}
                   </div>
-                  <p className="text-xs font-bold text-ink-900 truncate max-w-[80px] text-center">{u.Name}</p>
+                  <Link to={`/user/${u._id}`} className="text-xs font-bold text-ink-900 truncate max-w-[80px] text-center hover:text-accent-primary hover:underline">{u.Name}</Link>
                   <p className="text-xs font-bold text-accent-primary">{u.score}pts</p>
                   <div className={`w-20 ${heights[rank]} ${colors[rank]} rounded-t-lg flex items-center justify-center text-white font-extrabold text-xl shadow-md`}>
                     {medals[rank - 1]}
@@ -108,7 +109,7 @@ export default function Leaderboard() {
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-ink-900 truncate">{u.Name}</p>
+                  <Link to={`/user/${u._id}`} className="font-bold text-ink-900 truncate hover:text-accent-primary hover:underline block">{u.Name}</Link>
                   {(u.Branch || u.Year) && (
                     <p className="text-xs text-ink-800">{[u.Branch, u.Year ? `Year ${u.Year}` : ''].filter(Boolean).join(' · ')}</p>
                   )}

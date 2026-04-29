@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, UserCircle, Menu, Shield, MessageCircle, Search, Sun, Moon, Trophy, X, ChevronDown, Calculator, CheckSquare, ClipboardList, Layers, Clock, BookMarked } from 'lucide-react';
+import { BookOpen, UserCircle, Menu, Shield, Search, Sun, Moon, Trophy, X, ChevronDown, Calculator, CheckSquare, ClipboardList, Layers, Clock, BookMarked } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { apiFetch, fileUrl } from '../../lib/api';
-import NotificationBell from '../NotificationBell';
+import UnifiedInbox from '../UnifiedInbox';
 
 const TOOLS = [
   { to: '/cgpa',        icon: <Calculator    className="h-4 w-4" />, label: 'CGPA Calculator',   color: 'text-amber-600'   },
-  { to: '/attendance',  icon: <CheckSquare   className="h-4 w-4" />, label: 'Attendance Tracker', color: 'text-emerald-600' },
   { to: '/assignments', icon: <ClipboardList className="h-4 w-4" />, label: 'Assignments',        color: 'text-rose-600'    },
   { to: '/flashcards',  icon: <Layers        className="h-4 w-4" />, label: 'Flashcards',         color: 'text-indigo-600'  },
   { to: '/timetable',   icon: <Clock         className="h-4 w-4" />, label: 'Timetable',          color: 'text-blue-600'    },
@@ -17,7 +16,7 @@ const TOOLS = [
 
 export default function Navbar() {
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
-  const { dark, toggle } = useTheme();
+  const { isDark, toggleTheme } = useTheme();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState(null);
   const [searching, setSearching] = useState(false);
@@ -43,7 +42,7 @@ export default function Navbar() {
         setResults(r.success ? r.data : null);
       } catch { setResults(null); }
       finally { setSearching(false); }
-    }, 350);
+    }, 500); // Increased from 350ms to 500ms
     return () => clearTimeout(debounceRef.current);
   }, [query]);
 
@@ -174,20 +173,27 @@ export default function Navbar() {
             </div>
 
             {/* Dark mode */}
-            <button onClick={toggle} className="p-1.5 rounded-full text-ink-800 hover:text-accent-primary hover:bg-parchment-100 transition-colors" title="Toggle dark mode">
-              {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            <button onClick={toggleTheme} className="p-1.5 rounded-full text-ink-800 hover:text-accent-primary hover:bg-parchment-100 transition-colors" title="Toggle dark mode">
+              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
 
             {isAuthenticated && (
               <>
                 <div className="w-px h-5 bg-parchment-300 mx-1" />
-                <Link to="/inbox" className="p-1.5 rounded-full text-ink-800 hover:text-accent-primary hover:bg-parchment-100 transition-colors" title="Inbox">
-                  <MessageCircle className="h-4 w-4" />
-                </Link>
-                <NotificationBell />
+                <div className="pr-2">
+                  <UnifiedInbox />
+                </div>
                 <Link to="/profile" className="shrink-0" title="Profile">
                   {user?.Avatar ? (
-                    <img src={fileUrl(user.Avatar)} alt="avatar" className="h-7 w-7 rounded-full object-cover ring-2 ring-parchment-200 hover:ring-accent-primary transition-all" />
+                    <img 
+                      src={fileUrl(user.Avatar)} 
+                      alt="avatar" 
+                      className="h-7 w-7 rounded-full object-cover ring-2 ring-parchment-200 hover:ring-accent-primary transition-all" 
+                      onError={(e) => {
+                        console.error('Navbar avatar failed to load:', fileUrl(user.Avatar));
+                        e.target.style.display = 'none';
+                      }}
+                    />
                   ) : (
                     <div className="h-7 w-7 rounded-full bg-indigo-100 flex items-center justify-center hover:bg-indigo-200 transition-colors">
                       <UserCircle className="h-5 w-5 text-accent-primary" />
@@ -228,7 +234,6 @@ export default function Navbar() {
             { to: '/ai-summary',   label: 'AI Summary' },
             { to: '/upload',       label: 'Upload' },
             { to: '/cgpa',         label: '🎓 CGPA Calculator' },
-            { to: '/attendance',   label: '✅ Attendance Tracker' },
             { to: '/assignments',  label: '📋 Assignments' },
             { to: '/flashcards',   label: '🃏 Flashcards' },
             { to: '/timetable',    label: '🕐 Timetable' },

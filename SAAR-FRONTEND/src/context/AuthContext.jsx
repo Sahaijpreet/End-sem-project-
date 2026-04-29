@@ -16,6 +16,7 @@ export function AuthProvider({ children }) {
       body: JSON.stringify({ Email, Password }),
     });
     if (!res.success || !res.data?.token) throw new Error(res.message || 'Login failed');
+    
     const next = {
       token: res.data.token,
       user: {
@@ -23,13 +24,14 @@ export function AuthProvider({ children }) {
         Name: res.data.Name,
         Email: res.data.Email,
         Role: res.data.Role,
-        Avatar: res.data.Avatar || '',
+        Avatar: res.data.Avatar || null,
         Bio: res.data.Bio || '',
         Branch: res.data.Branch || '',
         Year: res.data.Year || null,
         CollegeID: res.data.CollegeID || '',
       },
     };
+    
     saveAuth(next);
     setAuth(next);
     return next.user;
@@ -64,7 +66,14 @@ export function AuthProvider({ children }) {
   const updateUser = useCallback((updatedUser) => {
     setAuth((prev) => {
       if (!prev) return prev;
-      const next = { ...prev, user: { ...prev.user, ...updatedUser } };
+      
+      const mergedUser = {
+        ...prev.user,
+        ...updatedUser,
+        Avatar: updatedUser.Avatar !== undefined ? updatedUser.Avatar : prev.user.Avatar
+      };
+      
+      const next = { ...prev, user: mergedUser };
       saveAuth(next);
       return next;
     });

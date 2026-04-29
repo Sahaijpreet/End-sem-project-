@@ -160,31 +160,48 @@ export default function NotesRepository() {
                   <h3 className="text-sm font-bold text-ink-900 mb-1 line-clamp-2">
                   <Link to={`/notes/${note._id}`} className="hover:text-accent-primary hover:underline">{note.Title}</Link>
                 </h3>
-                  <p className="text-xs text-ink-800 mb-2">By {note.UploaderID?.Name || 'Student'}</p>
+                  <p className="text-xs text-ink-800 mb-2">
+                    By {note.UploaderID?._id ? (
+                      <Link to={`/user/${note.UploaderID._id}`} className="hover:text-accent-primary hover:underline font-medium">
+                        {note.UploaderID.Name || 'Student'}
+                      </Link>
+                    ) : (
+                      'Student'
+                    )}
+                  </p>
                   <StarRating resourceType="Note" resourceId={note._id} />
                   <div className="flex gap-3 mt-1 text-xs text-ink-800">
                     <span>{note.Downloads ?? 0} downloads</span>
                   </div>
                 </div>
                 <div className="bg-parchment-50 px-3 py-2 border-t border-parchment-200 mt-auto flex gap-1.5 flex-wrap">
-                  <button onClick={() => handleDownload(note._id, pdfHref)}
-                    className="flex-1 flex items-center justify-center gap-1 py-2 px-3 text-sm font-medium rounded-lg text-white bg-accent-primary hover:bg-accent-hover transition-colors">
-                    <Download className="h-4 w-4" /> Open
-                  </button>
-                  <Link to="/ai-summary" state={{ noteId: note._id }}
-                    className="flex items-center justify-center py-2 px-3 border border-parchment-300 rounded-lg text-sm font-medium text-ink-900 bg-white hover:bg-parchment-50">
-                    AI
-                  </Link>
-                  <button type="button" onClick={() => handleBookmark(note._id)}
-                    className={`flex items-center justify-center py-2 px-3 border rounded-lg text-sm transition-colors ${isBookmarked ? 'bg-violet-100 border-violet-300 text-violet-600' : 'border-parchment-300 text-ink-800 bg-white hover:bg-parchment-50'}`}>
-                    {isBookmarked ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
-                  </button>
-                  <button type="button" onClick={() => setActiveComment(activeComment === note._id ? null : note._id)}
-                    className="flex items-center justify-center py-2 px-3 border border-parchment-300 rounded-lg text-sm text-ink-800 bg-white hover:bg-parchment-50">
-                    <MessageSquare className="h-4 w-4" />
-                  </button>
+                  {isAuthenticated ? (
+                    <>
+                      <button onClick={() => handleDownload(note._id, pdfHref)}
+                        className="flex-1 flex items-center justify-center gap-1 py-2 px-3 text-sm font-medium rounded-lg text-white bg-accent-primary hover:bg-accent-hover transition-colors">
+                        <Download className="h-4 w-4" /> Open
+                      </button>
+                      <Link to="/ai-summary" state={{ noteId: note._id }}
+                        className="flex items-center justify-center py-2 px-3 border border-parchment-300 rounded-lg text-sm font-medium text-ink-900 bg-white hover:bg-parchment-50">
+                        AI
+                      </Link>
+                      <button type="button" onClick={() => handleBookmark(note._id)}
+                        className={`flex items-center justify-center py-2 px-3 border rounded-lg text-sm transition-colors ${isBookmarked ? 'bg-violet-100 border-violet-300 text-violet-600' : 'border-parchment-300 text-ink-800 bg-white hover:bg-parchment-50'}`}>
+                        {isBookmarked ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
+                      </button>
+                      <button type="button" onClick={() => setActiveComment(activeComment === note._id ? null : note._id)}
+                        className="flex items-center justify-center py-2 px-3 border border-parchment-300 rounded-lg text-sm text-ink-800 bg-white hover:bg-parchment-50">
+                        <MessageSquare className="h-4 w-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <Link to="/auth" state={{ mode: 'login' }}
+                      className="flex-1 flex items-center justify-center gap-1 py-2 px-3 text-sm font-medium rounded-lg text-white bg-accent-primary hover:bg-accent-hover transition-colors">
+                      Login to Access
+                    </Link>
+                  )}
                 </div>
-                {activeComment === note._id && (
+                {activeComment === note._id && isAuthenticated && (
                   <div className="px-4 pb-4 border-t border-parchment-100">
                     <div className="flex justify-end pt-2">
                       <button onClick={() => setActiveComment(null)} className="text-slate-400 hover:text-ink-900"><X className="h-4 w-4" /></button>

@@ -27,6 +27,14 @@ export function getAuthToken() {
 export async function apiFetch(path, options = {}) {
   const { skipAuth, ...fetchOpts } = options;
   const url = path.startsWith('http') ? path : `${API_BASE}${path}`;
+  
+  console.log('API Request:', {
+    url,
+    method: fetchOpts.method || 'GET',
+    API_BASE,
+    path
+  });
+  
   const headers = { ...(fetchOpts.headers || {}) };
   if (fetchOpts.body && !(fetchOpts.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
@@ -35,16 +43,37 @@ export async function apiFetch(path, options = {}) {
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  const res = await fetch(url, { ...fetchOpts, headers });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const msg = data.message || data.error || res.statusText || 'Request failed';
-    const err = new Error(msg);
-    err.status = res.status;
-    err.data = data;
-    throw err;
+  
+  try {
+    const res = await fetch(url, { ...fetchOpts, headers });
+    console.log('API Response status:', res.status, res.statusText);
+    
+    let data;
+    try {
+      data = await res.json();
+    } catch (jsonError) {
+      console.error('JSON parse error:', jsonError);
+      data = {};
+    }
+    
+    console.log('API Response data:', data);
+    
+    if (!res.ok) {
+      const msg = data.message || data.error || res.statusText || 'Request failed';
+      const err = new Error(msg);
+      err.status = res.status;
+      err.data = data;
+      console.error('API Error:', err);
+      throw err;
+    }
+    return data;
+  } catch (fetchError) {
+    console.error('Fetch error:', fetchError);
+    if (fetchError.name === 'TypeError' && fetchError.message.includes('fetch')) {
+      throw new Error('Network error: Unable to connect to server. Please check if the backend is running.');
+    }
+    throw fetchError;
   }
-  return data;
 }
 
 export function fileUrl(pathOrUrl) {
