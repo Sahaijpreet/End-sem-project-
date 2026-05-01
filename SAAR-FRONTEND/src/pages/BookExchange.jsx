@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Search, Filter, BookOpen, MessageCircle, MapPin, CheckCircle, XCircle, Bell, ImagePlus, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Search, Filter, BookOpen, MessageCircle, MapPin, CheckCircle, XCircle, Bell, ImagePlus, X, Trash2 } from 'lucide-react';
 import { apiFetch, fileUrl } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -116,6 +117,15 @@ export default function BookExchange() {
     }
   }
 
+  async function deleteBook(id) {
+    if (!window.confirm('Delete this book listing? This cannot be undone.')) return;
+    try {
+      await apiFetch(`/api/books/${id}`, { method: 'DELETE' });
+      setBooks((prev) => prev.filter((b) => b._id !== id));
+      toast('Book deleted.');
+    } catch (err) { toast(err.message || 'Failed to delete.', 'error'); }
+  }
+
   async function requestBook(id) {
     if (!isAuthenticated) { toast('Log in to request a book.', 'error'); return; }
     setActionId(id);
@@ -148,46 +158,88 @@ export default function BookExchange() {
     }
   }
 
-  return (
-    <div className="flex-1 bg-parchment-50 py-8 min-h-[calc(100vh-4rem)]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+  const STATUSES = ['Available', 'Requested', 'Exchanged'];
+  const SUBJECTS = ['Computer Science', 'Physics', 'Mathematics', 'Economics', 'Chemistry', 'Biology'];
 
-        <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-ink-900 flex items-center gap-3">
-              <BookOpen className="h-8 w-8 text-accent-primary" />
-              Book Exchange Marketplace
-            </h1>
-            <p className="text-ink-800 mt-2 max-w-2xl">List books you own or request an exchange when a copy is available.</p>
+  return (
+    <div className="flex-1 bg-parchment-50 min-h-[calc(100vh-4rem)] flex flex-col md:flex-row">
+      {/* Sidebar Filters */}
+      <aside className="w-full md:w-52 bg-white border-r border-parchment-200 flex-shrink-0">
+        <div className="p-5 sticky top-16 max-h-[calc(100vh-4rem)] overflow-y-auto">
+          <div className="flex items-center gap-2 mb-5 text-ink-900">
+            <Filter className="h-5 w-5" />
+            <h2 className="text-lg font-bold">Filters</h2>
           </div>
-          <div className="flex gap-2">
+          <div className="mb-5">
+            <h3 className="text-sm font-semibold text-ink-900 mb-3">Status</h3>
+            <div className="space-y-2">
+              {STATUSES.map((s) => (
+                <label key={s} className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox"
+                    checked={filterStatus === s}
+                    onChange={() => setFilterStatus(filterStatus === s ? 'All' : s)}
+                    className="rounded border-parchment-300 text-accent-primary focus:ring-indigo-500" />
+                  <span className="text-sm text-ink-800">{s}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-ink-900 mb-3">Subject</h3>
+            <div className="space-y-2">
+              {SUBJECTS.map((s) => (
+                <label key={s} className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox"
+                    checked={subjectFilter === s}
+                    onChange={() => setSubjectFilter(subjectFilter === s ? '' : s)}
+                    className="rounded border-parchment-300 text-accent-primary focus:ring-indigo-500" />
+                  <span className="text-sm text-ink-800">{s}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <div className="flex-1 p-4 min-w-0">
+      <div className="max-w-none">
+
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4 animate-[fadeSlideDown_0.4s_ease_both] bg-white border border-parchment-200 rounded-xl px-5 py-4 shadow-sm">
+          <div>
+            <h1 className="text-2xl font-bold text-ink-900 flex items-center gap-2">
+              <BookOpen className="h-6 w-6 text-accent-primary" />
+              Book Exchange
+            </h1>
+            <p className="text-ink-800 text-sm mt-0.5">List books you own or request an exchange when a copy is available.</p>
+          </div>
+          <div className="flex gap-2 flex-wrap">
             {isAuthenticated && (
               <>
                 <button
                   type="button"
                   onClick={() => { setTab(tab === 'requests' ? 'browse' : 'requests'); loadMyRequests(); }}
-                  className={`flex items-center gap-2 border border-parchment-300 px-4 py-2.5 rounded-lg font-medium transition-colors ${
+                  className={`flex items-center gap-2 border border-parchment-300 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                     tab === 'requests' ? 'bg-accent-primary text-white' : 'bg-white text-ink-800 hover:bg-parchment-50'
                   }`}
                 >
                   <Bell className="h-4 w-4" />
-                  Incoming {myRequests.length > 0 && <span className="bg-red-500 text-white text-xs rounded-full px-1.5">{myRequests.filter(r => r.Status === 'Pending').length}</span>}
+                  Incoming {myRequests.filter(r => r.Status === 'Pending').length > 0 && <span className="bg-red-500 text-white text-xs rounded-full px-1.5">{myRequests.filter(r => r.Status === 'Pending').length}</span>}
                 </button>
                 <button
                   type="button"
                   onClick={() => { setTab(tab === 'my-requests' ? 'browse' : 'my-requests'); loadMyRequests(); }}
-                  className={`flex items-center gap-2 border border-parchment-300 px-4 py-2.5 rounded-lg font-medium transition-colors ${
+                  className={`flex items-center gap-2 border border-parchment-300 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                     tab === 'my-requests' ? 'bg-accent-primary text-white' : 'bg-white text-ink-800 hover:bg-parchment-50'
                   }`}
                 >
-                  My Requests {myOutgoingRequests.length > 0 && <span className="bg-blue-500 text-white text-xs rounded-full px-1.5">{myOutgoingRequests.filter(r => r.Status === 'Pending').length}</span>}
+                  My Requests {myOutgoingRequests.filter(r => r.Status === 'Pending').length > 0 && <span className="bg-blue-500 text-white text-xs rounded-full px-1.5">{myOutgoingRequests.filter(r => r.Status === 'Pending').length}</span>}
                 </button>
               </>
             )}
             <button
               type="button"
               onClick={() => (isAuthenticated ? setListOpen(true) : toast('Log in to list a book.', 'error'))}
-              className="bg-accent-primary text-white px-6 py-2.5 rounded-lg shadow-sm font-medium hover:bg-accent-hover transition-colors whitespace-nowrap"
+              className="bg-accent-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent-hover transition-colors whitespace-nowrap"
             >
               + List a Book
             </button>
@@ -332,61 +384,24 @@ export default function BookExchange() {
         )}
 
         {(tab === 'browse' || tab === 'requests' || tab === 'my-requests') && (
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-parchment-200 mb-8 flex flex-col lg:flex-row gap-4 justify-between items-center">
-
-            <div className="relative w-full lg:w-96">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-5 w-5 text-slate-400" />
-              </div>
-              <input
-                type="text"
-                placeholder="Search by title or author..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2.5 border border-parchment-300 rounded-lg bg-parchment-50 hover:bg-white focus:bg-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
-              />
+          <div className="relative mb-6">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 text-slate-400" />
             </div>
-
-            <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
-              <div className="flex items-center gap-2 text-sm">
-                <Filter className="h-4 w-4 text-ink-800" />
-                <span className="font-medium text-ink-800">Status:</span>
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="border-parchment-300 rounded-md shadow-sm py-1.5 pl-3 pr-8 focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  <option value="All">All Books</option>
-                  <option value="Available">Available</option>
-                  <option value="Requested">Requested</option>
-                  <option value="Exchanged">Exchanged</option>
-                </select>
-              </div>
-
-              <div className="flex items-center gap-2 text-sm">
-                <span className="font-medium text-ink-800">Subject:</span>
-                <select
-                  value={subjectFilter}
-                  onChange={(e) => setSubjectFilter(e.target.value)}
-                  className="border-parchment-300 rounded-md shadow-sm py-1.5 pl-3 pr-8 focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  <option value="">All Subjects</option>
-                  <option value="Computer Science">Computer Science</option>
-                  <option value="Physics">Physics</option>
-                  <option value="Mathematics">Mathematics</option>
-                  <option value="Economics">Economics</option>
-                  <option value="Chemistry">Chemistry</option>
-                  <option value="Biology">Biology</option>
-                </select>
-              </div>
-            </div>
+            <input
+              type="text"
+              placeholder="Search by title or author..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="block w-full pl-9 pr-3 py-2 border border-parchment-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm"
+            />
           </div>
         )}
 
         {loading && tab === 'browse' && <p className="text-ink-800 mb-4">Loading books…</p>}
 
         {tab === 'browse' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filteredBooks.map((book) => {
               const owner = book.OwnerID?.Name || 'Student';
               const busy = actionId === book._id;
@@ -440,7 +455,13 @@ export default function BookExchange() {
                           )}
                         </div>
                         {isMyBook ? (
-                          <span className="text-xs text-slate-500 px-3 py-1.5 bg-slate-100 rounded-md">Your book</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-500 px-3 py-1.5 bg-slate-100 rounded-md">Your book</span>
+                            <button type="button" onClick={() => deleteBook(book._id)}
+                              className="flex items-center gap-1 px-2 py-1.5 bg-rose-50 text-rose-600 border border-rose-200 rounded-md text-xs hover:bg-rose-100 transition-colors">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         ) : hasRequested ? (
                           <span className="text-xs text-amber-700 px-3 py-1.5 bg-amber-100 rounded-md font-medium">Requested</span>
                         ) : book.Status === 'Available' ? (
@@ -466,9 +487,9 @@ export default function BookExchange() {
           </div>
         )}
 
-        {listOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 overflow-y-auto">
-            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 my-8 max-h-[90vh] overflow-y-auto">
+        {listOpen && createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={(e) => e.target === e.currentTarget && setListOpen(false)}>
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
               <h2 className="text-lg font-bold text-ink-900 mb-4">List a book</h2>
               <form onSubmit={handleListBook} className="space-y-4">
                 <div>
@@ -543,7 +564,8 @@ export default function BookExchange() {
               </form>
             </div>
           </div>
-        )}
+        , document.body)}
+      </div>
       </div>
     </div>
   );

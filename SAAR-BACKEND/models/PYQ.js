@@ -21,6 +21,10 @@ const PYQSchema = new mongoose.Schema({
     type: Number,
     required: [true, 'Please specify the exam year']
   },
+  Degree: {
+    type: String,
+    default: ''
+  },
   ExamType: {
     type: String,
     enum: ['Mid Semester', 'End Semester', 'Quiz', 'Other'],

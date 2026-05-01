@@ -9,6 +9,8 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
+import mongoSanitize from 'express-mongo-sanitize';
 import User from './models/User.js';
 
 import authRoutes from './routes/authRoutes.js';
@@ -31,6 +33,14 @@ import timetableRoutes from './routes/timetableRoutes.js';
 import syllabusRoutes from './routes/syllabusRoutes.js';
 
 dotenv.config();
+
+// Validate required env vars at startup
+const REQUIRED_ENV = ['MONGO_URI', 'JWT_SECRET'];
+const missingEnv = REQUIRED_ENV.filter((k) => !process.env[k]);
+if (missingEnv.length) {
+  console.error(`Missing required environment variables: ${missingEnv.join(', ')}`);
+  process.exit(1);
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -76,28 +86,35 @@ io.on('connection', (socket) => {
   });
 });
 
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors(corsOptions));
-app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use(express.json({ limit: '10kb' }));
+app.use(mongoSanitize({ allowDots: true }));
+
+// Serve uploads without X-Frame-Options so PDFs can be embedded in iframes
+app.use('/uploads', (req, res, next) => {
+  res.removeHeader('X-Frame-Options');
+  res.setHeader('Content-Security-Policy', "frame-ancestors *");
+  next();
+}, express.static(path.join(__dirname, 'uploads')));
 
 // Rate limiting
-const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200, standardHeaders: true, legacyHeaders: false });
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 50, message: { success: false, message: 'Too many attempts, try again later.' } });
-app.use('/api/', apiLimiter);
+// Auth brute-force protection only — no limits on read/browse endpoints
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { success: false, message: 'Too many attempts, try again later.' } });
+const uploadLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 60, message: { success: false, message: 'Too many uploads, try again later.' } });
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/forgot-password', authLimiter);
+// Only limit mutating upload requests, not GETs
+app.use('/api/notes', (req, res, next) => req.method === 'POST' ? uploadLimiter(req, res, next) : next());
+app.use('/api/pyqs', (req, res, next) => req.method === 'POST' ? uploadLimiter(req, res, next) : next());
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('MongoDB Connected Successfully'))
   .catch(err => console.error('MongoDB Connection Error:', err));
 
 app.get('/', (req, res) => res.send('SAAR Backend API is running...'));
-
-// Global error handler
-app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(err.status || 500).json({ success: false, message: err.message || 'Internal server error' });
-});
+app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
 app.use('/api/public', publicRoutes);
 app.use('/api/auth', authRoutes);
@@ -117,5 +134,14 @@ app.use('/api/forum', doubtRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/timetable', timetableRoutes);
 app.use('/api/syllabus', syllabusRoutes);
+
+// 404 handler
+app.use((req, res) => res.status(404).json({ success: false, message: 'Route not found' }));
+
+// Global error handler — must be last
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(err.status || 500).json({ success: false, message: err.message || 'Internal server error' });
+});
 
 httpServer.listen(PORT, () => console.log(`Server running on port ${PORT}`));

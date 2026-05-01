@@ -36,11 +36,27 @@ export default function NoteDetail() {
         </Link>
 
         <div className="animate-fade-up bg-white rounded-2xl border border-parchment-200 shadow-sm overflow-hidden">
-          {note.CoverImage && (
-            <div className="h-52 w-full overflow-hidden">
-              <img src={fileUrl(note.CoverImage)} alt="cover" className="w-full h-full object-cover" />
-            </div>
-          )}
+          {(() => {
+            const href = fileUrl(note.FileURL);
+            const isImage = note.FileURL && /\.(jpg|jpeg|png|webp|gif)$/i.test(note.FileURL);
+            const isPdf = note.FileURL && note.FileURL.toLowerCase().endsWith('.pdf');
+            if (note.CoverImage) return (
+              <div className="h-52 w-full overflow-hidden">
+                <img src={fileUrl(note.CoverImage)} alt="cover" className="w-full h-full object-cover" />
+              </div>
+            );
+            if (isImage) return (
+              <div className="h-52 w-full overflow-hidden bg-parchment-100">
+                <img src={href} alt="preview" className="w-full h-full object-contain" />
+              </div>
+            );
+            if (isPdf) return (
+              <div className="h-72 w-full overflow-hidden border-b border-parchment-200">
+                <iframe src={`${href}#page=1&toolbar=0&navpanes=0&scrollbar=0`} className="w-full h-full" title="PDF preview" />
+              </div>
+            );
+            return null;
+          })()}
           <div className="p-6">
             <div className="flex flex-wrap gap-2 mb-3">
               <span className="px-2.5 py-0.5 bg-indigo-100 text-accent-primary text-xs font-semibold rounded-full">{note.Subject}</span>
@@ -50,7 +66,6 @@ export default function NoteDetail() {
             <div className="flex flex-wrap gap-4 text-sm text-ink-800 mb-4">
               <span className="flex items-center gap-1.5"><User className="h-4 w-4 text-slate-400" />{note.UploaderID?.Name || 'Student'}</span>
               <span className="flex items-center gap-1.5"><Calendar className="h-4 w-4 text-slate-400" />{new Date(note.UploadDate).toLocaleDateString()}</span>
-              <span className="flex items-center gap-1.5"><Download className="h-4 w-4 text-slate-400" />{note.Downloads ?? 0} downloads</span>
             </div>
             <StarRating resourceType="Note" resourceId={id} />
             <div className="flex flex-wrap gap-3 mt-6">

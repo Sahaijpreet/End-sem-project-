@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Search, Filter, ChevronDown, Download, Bookmark, BookmarkCheck, MessageSquare, X } from 'lucide-react';
+import { Search, Filter, ChevronDown, Download, Bookmark, BookmarkCheck, MessageSquare, X, Trash2 } from 'lucide-react';
 import { apiFetch, fileUrl } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useReveal } from '../hooks/useReveal';
+import PdfPreview from '../components/PdfPreview';
 import StarRating from '../components/StarRating';
 import Comments from '../components/Comments';
 
@@ -42,7 +43,15 @@ export default function NotesRepository() {
           setBookmarks(ids);
         }
       })
-      .catch((err) => { if (!cancelled) { setError(err.message || 'Failed to load notes'); setNotes([]); } })
+      .catch((err) => {
+        if (cancelled) return;
+        if (err.isRateLimit) {
+          setError('Too many requests — please wait a moment and refresh.');
+        } else {
+          setError(err.message || 'Failed to load notes');
+          setNotes([]);
+        }
+      })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [isAuthenticated]);
@@ -74,7 +83,16 @@ export default function NotesRepository() {
         return n;
       });
       toast(res.data.bookmarked ? 'Bookmarked!' : 'Bookmark removed.');
-    } catch (e) { toast(e.message || 'Failed to bookmark.', 'error'); }
+    } catch (err) { toast(err.message || 'Failed to bookmark.', 'error'); }
+  }
+
+  async function handleDelete(noteId) {
+    if (!window.confirm('Delete this note? This cannot be undone.')) return;
+    try {
+      await apiFetch(`/api/notes/${noteId}`, { method: 'DELETE' });
+      setNotes((prev) => prev.filter((n) => n._id !== noteId));
+      toast('Note deleted.');
+    } catch (err) { toast(err.message || 'Failed to delete.', 'error'); }
   }
 
   function handleDownload(noteId, pdfHref) {
@@ -84,7 +102,7 @@ export default function NotesRepository() {
 
   return (
     <div className="flex-1 bg-parchment-50 min-h-[calc(100vh-4rem)] flex flex-col md:flex-row">
-      <aside className="w-full md:w-64 lg:w-72 bg-white border-r border-parchment-200 flex-shrink-0">
+      <aside className="w-full md:w-52 bg-white border-r border-parchment-200 flex-shrink-0">
         <div className="p-6 sticky top-16 max-h-[calc(100vh-4rem)] overflow-y-auto">
           <div className="flex items-center gap-2 mb-6 text-ink-900">
             <Filter className="h-5 w-5" />
@@ -121,58 +139,56 @@ export default function NotesRepository() {
         </div>
       </aside>
 
-      <main className="flex-1 p-6 lg:p-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+      <main className="flex-1 p-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4 animate-[fadeSlideDown_0.4s_ease_both] bg-white border border-parchment-200 rounded-xl px-5 py-4 shadow-sm">
           <div>
             <h1 className="text-2xl font-bold text-ink-900">Notes Repository</h1>
-            <p className="text-ink-800 text-sm mt-1">Browse notes shared by your peers.</p>
+            <p className="text-ink-800 text-sm mt-0.5">Browse notes shared by your peers.</p>
           </div>
-          <div className="relative w-full md:w-96">
+          <div className="relative w-full md:w-80">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-4 w-4 text-slate-400" />
             </div>
             <input type="text" placeholder="Search notes by title or subject..." value={searchTerm}
               onChange={(e) => { const v = e.target.value; setSearchTerm(v); setSearchParams(v ? { q: v } : {}); }}
-              className="block w-full pl-10 pr-3 py-2 border border-parchment-300 rounded-lg text-sm bg-white text-ink-900 focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm" />
+              className="block w-full pl-10 pr-3 py-2 border border-parchment-300 rounded-lg text-sm bg-parchment-50 text-ink-900 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
           </div>
         </div>
 
-        {error && <div className="mb-4 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-sm">{error}</div>}
-        <div className="mb-6 text-sm text-ink-800">{loading ? 'Loading…' : `Showing ${filtered.length} results`}</div>
+        {error && <div className="mb-3 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-sm">{error}</div>}
+        <div className="mb-4 text-sm text-ink-800 animate-[fadeIn_0.5s_ease_both]">{loading ? 'Loading…' : `Showing ${filtered.length} results`}</div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {!loading && filtered.length === 0 && <p className="text-ink-800 col-span-full">No notes match your filters yet.</p>}
           {filtered.map((note, idx) => {
             const pdfHref = fileUrl(note.FileURL);
             const isBookmarked = bookmarks.has(note._id);
+            const isImage = note.FileURL && /\.(jpg|jpeg|png|webp|gif)$/i.test(note.FileURL);
+            const isPdf = note.FileURL && note.FileURL.toLowerCase().endsWith('.pdf');
             return (
-              <div key={note._id} className={`card-hover bg-white rounded-xl shadow-sm border border-parchment-200 overflow-hidden group flex flex-col`}>
-                {note.CoverImage && (
-                  <div className="h-44 w-full overflow-hidden">
-                    <img src={fileUrl(note.CoverImage)} alt="cover" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                  </div>
-                )}
-                <div className="p-3 flex-1">
-                  <div className="flex justify-between items-start mb-2">
+              <div key={note._id}
+                style={{ animationDelay: `${idx * 60}ms` }}
+                className="card-hover bg-white rounded-xl shadow-sm border border-parchment-200 overflow-hidden group flex flex-col animate-[fadeSlideUp_0.4s_ease_both]"
+              >
+                <div className="h-44 w-full overflow-hidden bg-parchment-100 border-b border-parchment-200">
+                  <PdfPreview fileURL={note.FileURL} coverImage={note.CoverImage} className="w-full h-44" />
+                </div>
+                <div className="px-3 pt-2 pb-1 flex-1">
+                  <div className="flex justify-between items-center mb-1">
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-accent-primary">{note.Subject}</span>
                     <span className="text-xs font-semibold text-slate-400">Sem {note.Semester}</span>
                   </div>
-                  <h3 className="text-sm font-bold text-ink-900 mb-1 line-clamp-2">
-                  <Link to={`/notes/${note._id}`} className="hover:text-accent-primary hover:underline">{note.Title}</Link>
-                </h3>
-                  <p className="text-xs text-ink-800 mb-2">
+                  <h3 className="text-sm font-bold text-ink-900 mb-0.5 line-clamp-2">
+                    <Link to={`/notes/${note._id}`} className="hover:text-accent-primary hover:underline">{note.Title}</Link>
+                  </h3>
+                  <p className="text-xs text-ink-800 mb-1">
                     By {note.UploaderID?._id ? (
                       <Link to={`/user/${note.UploaderID._id}`} className="hover:text-accent-primary hover:underline font-medium">
                         {note.UploaderID.Name || 'Student'}
                       </Link>
-                    ) : (
-                      'Student'
-                    )}
+                    ) : 'Student'}
                   </p>
-                  <StarRating resourceType="Note" resourceId={note._id} />
-                  <div className="flex gap-3 mt-1 text-xs text-ink-800">
-                    <span>{note.Downloads ?? 0} downloads</span>
-                  </div>
+                  <StarRating resourceType="Note" resourceId={note._id} initialData={note.rating} />
                 </div>
                 <div className="bg-parchment-50 px-3 py-2 border-t border-parchment-200 mt-auto flex gap-1.5 flex-wrap">
                   {isAuthenticated ? (
@@ -193,6 +209,12 @@ export default function NotesRepository() {
                         className="flex items-center justify-center py-2 px-3 border border-parchment-300 rounded-lg text-sm text-ink-800 bg-white hover:bg-parchment-50">
                         <MessageSquare className="h-4 w-4" />
                       </button>
+                      {note.UploaderID?._id === user?._id && (
+                        <button type="button" onClick={() => handleDelete(note._id)}
+                          className="flex items-center justify-center py-2 px-3 border border-rose-200 rounded-lg text-sm text-rose-600 bg-white hover:bg-rose-50 transition-colors">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </>
                   ) : (
                     <Link to="/auth" state={{ mode: 'login' }}

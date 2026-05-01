@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { UserCircle, FileText, BookOpen, Mail, IdCard, Edit2, Check, X, ArrowLeftRight, Bookmark, Camera, Download, ExternalLink, Users } from 'lucide-react';
+import { UserCircle, FileText, BookOpen, Mail, IdCard, Edit2, Check, X, ArrowLeftRight, Bookmark, Camera, ExternalLink, Users } from 'lucide-react';
 import { apiFetch, fileUrl } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -36,54 +36,33 @@ export default function Profile() {
   }, [user]);
 
   useEffect(() => {
+    if (!user?._id) return;
     let cancelled = false;
     Promise.all([
-      apiFetch('/api/notes', { skipAuth: true }),
-      apiFetch('/api/books', { skipAuth: true }),
+      apiFetch(`/api/users/${user._id}`),
       apiFetch('/api/chat/conversations'),
       apiFetch('/api/auth/bookmarks'),
-    ]).then(([nRes, bRes, cRes, bmRes]) => {
+    ]).then(([profileRes, cRes, bmRes]) => {
       if (cancelled) return;
-      setNotes(nRes.success && Array.isArray(nRes.data) ? nRes.data : []);
-      setBooks(bRes.success && Array.isArray(bRes.data) ? bRes.data : []);
+      if (profileRes.success) {
+        setNotes(profileRes.data.notes || []);
+        setBooks(profileRes.data.myBooks || []);
+        setFollowersCount(profileRes.data.followersCount || 0);
+        setFollowingCount(profileRes.data.followingCount || 0);
+      }
       setExchanges(cRes.success ? cRes.data.filter((c) => c.ExchangeCompleted) : []);
       setBookmarks(bmRes.success ? bmRes.data : { notes: [], pyqs: [] });
-    }).catch((error) => {
-      console.error('Failed to load profile data:', error);
+    }).catch((err) => {
+      console.error('Failed to load profile data:', err.message);
     }).finally(() => { if (!cancelled) setLoading(false); });
-    
-    // Load social counts
-    loadSocialCounts();
-    
     return () => { cancelled = true; };
-  }, []);
+  }, [user?._id]);
 
-  const myNotes = useMemo(() => {
-    const uid = user?._id;
-    if (!uid) return [];
-    return notes.filter((n) => (typeof n.UploaderID === 'object' ? String(n.UploaderID._id) : String(n.UploaderID)) === String(uid));
-  }, [notes, user]);
+  const myNotes = useMemo(() => notes, [notes]);
 
-  const myBooks = useMemo(() => {
-    const uid = user?._id;
-    if (!uid) return [];
-    return books.filter((b) => (typeof b.OwnerID === 'object' ? String(b.OwnerID._id) : String(b.OwnerID)) === String(uid));
-  }, [books, user]);
+  const myBooks = useMemo(() => books, [books]);
 
-  async function loadSocialCounts() {
-    if (!user?._id) return;
-    try {
-      const r = await apiFetch(`/api/users/${user._id}`);
-      if (r.success) {
-        setFollowersCount(r.data.followersCount || 0);
-        setFollowingCount(r.data.followingCount || 0);
-      }
-    } catch (e) {
-      console.error('Failed to load social counts:', e.message);
-    }
-  }
-
-  async function loadFollowers() {
+async function loadFollowers() {
     if (!user?._id || loadingFollowers || followers.length > 0) return;
     setLoadingFollowers(true);
     try {
@@ -123,27 +102,9 @@ export default function Profile() {
       const fd = new FormData();
       Object.entries(form).forEach(([k, v]) => v !== undefined && fd.append(k, v));
       if (avatarFile) fd.append('avatar', avatarFile);
-      
-      console.log('Saving profile with avatar file:', avatarFile);
-      
       const res = await apiFetch('/api/auth/profile', { method: 'PATCH', body: fd });
-      console.log('Profile save response:', res);
-      
       if (res.success) {
-        // Update user data with server response
         updateUser(res.data);
-        
-        // Also fetch fresh user data to ensure avatar is loaded
-        try {
-          const userRes = await apiFetch('/api/auth/me');
-          if (userRes.success) {
-            console.log('Fresh user data:', userRes.data);
-            updateUser(userRes.data);
-          }
-        } catch (e) {
-          console.error('Failed to fetch fresh user data:', e);
-        }
-        
         toast('Profile updated successfully!');
         setEditing(false);
         setAvatarFile(null);
@@ -152,7 +113,6 @@ export default function Profile() {
         throw new Error(res.message || 'Update failed');
       }
     } catch (err) {
-      console.error('Profile save error:', err);
       toast(err.message || 'Update failed', 'error');
     } finally {
       setSaving(false);
@@ -162,15 +122,6 @@ export default function Profile() {
   useReveal();
 
   const avatarSrc = avatarPreview || (user?.Avatar ? fileUrl(user.Avatar) : null);
-  
-  // Debug logging
-  console.log('Profile Debug:', {
-    user: user,
-    userAvatar: user?.Avatar,
-    avatarPreview: avatarPreview,
-    avatarSrc: avatarSrc,
-    fileUrlResult: user?.Avatar ? fileUrl(user.Avatar) : 'no avatar'
-  });
 
   return (
     <div className="flex-1 min-h-[calc(100vh-4rem)] relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #fbf8f1 0%, #f4ebd8 40%, #fbf8f1 100%)' }}>
@@ -193,16 +144,7 @@ export default function Profile() {
             <div className="relative shrink-0">
               <div className="w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center overflow-hidden">
                 {avatarSrc ? (
-                  <img 
-                    src={avatarSrc} 
-                    alt="avatar" 
-                    className="w-full h-full object-cover" 
-                    onError={(e) => {
-                      console.error('Avatar image failed to load:', avatarSrc);
-                      e.target.style.display = 'none';
-                    }}
-                    onLoad={() => console.log('Avatar image loaded successfully:', avatarSrc)}
-                  />
+                  <img src={avatarSrc} alt="avatar" className="w-full h-full object-cover" />
                 ) : (
                   <UserCircle className="h-12 w-12 text-accent-primary" />
                 )}
@@ -284,7 +226,6 @@ export default function Profile() {
             { icon: <FileText className="h-6 w-6 text-accent-primary" />, bg: 'bg-indigo-100', val: myNotes.length, label: 'Notes uploaded' },
             { icon: <BookOpen className="h-6 w-6 text-amber-600" />, bg: 'bg-amber-100', val: myBooks.length, label: 'Books listed' },
             { icon: <Bookmark className="h-6 w-6 text-violet-500" />, bg: 'bg-violet-100', val: (bookmarks.notes?.length || 0) + (bookmarks.pyqs?.length || 0), label: 'Bookmarks' },
-            { icon: <Download className="h-6 w-6 text-emerald-600" />, bg: 'bg-emerald-100', val: myNotes.reduce((s, n) => s + (n.Downloads || 0), 0), label: 'Total downloads' },
           ].map(({ icon, bg, val, label }) => (
             <div key={label} className="card-hover bg-white rounded-xl border border-parchment-200 p-5 flex items-center gap-3">
               <div className={`${bg} p-3 rounded-lg`}>{icon}</div>
@@ -317,7 +258,7 @@ export default function Profile() {
                     <p className="text-sm text-ink-800">{n.Subject} · Sem {n.Semester}</p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-xs text-ink-800 hidden sm:block">{n.Downloads ?? 0} downloads</span>
+                    <span className="text-xs text-ink-800 hidden sm:block">{n.Subject} · Sem {n.Semester}</span>
                     <a href={fileUrl(n.FileURL)} target="_blank" rel="noreferrer"
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-accent-primary text-white rounded-lg text-xs font-medium hover:bg-accent-hover transition-colors">
                       <ExternalLink className="h-3.5 w-3.5" /> Open

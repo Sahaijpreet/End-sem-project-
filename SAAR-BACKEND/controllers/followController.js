@@ -1,14 +1,16 @@
 import Follow from '../models/Follow.js';
 import User from '../models/User.js';
 import Note from '../models/Note.js';
+import Book from '../models/Book.js';
 import { createNotification } from './notificationController.js';
 
 export const getPublicProfile = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select('-PasswordHash -Bookmarks');
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    const [notes, followersCount, followingCount] = await Promise.all([
-      Note.find({ UploaderID: user._id }).select('Title Subject Semester Downloads CoverImage').sort('-createdAt').limit(20),
+    const [notes, myBooks, followersCount, followingCount] = await Promise.all([
+      Note.find({ UploaderID: user._id }).select('Title Subject Semester Downloads CoverImage FileURL').sort('-createdAt').limit(20),
+      Book.find({ OwnerID: user._id }).select('Title Author Subject Status').sort('-createdAt'),
       Follow.countDocuments({ FollowingID: user._id }),
       Follow.countDocuments({ FollowerID: user._id }),
     ]);
@@ -16,7 +18,7 @@ export const getPublicProfile = async (req, res) => {
     if (req.user) {
       isFollowing = !!(await Follow.findOne({ FollowerID: req.user._id, FollowingID: user._id }));
     }
-    res.json({ success: true, data: { user, notes, followersCount, followingCount, isFollowing } });
+    res.json({ success: true, data: { user, notes, myBooks, followersCount, followingCount, isFollowing } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

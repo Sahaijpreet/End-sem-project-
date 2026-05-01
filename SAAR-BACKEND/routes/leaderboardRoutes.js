@@ -3,5 +3,5 @@ import { getLeaderboard } from '../controllers/leaderboardController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
-router.get('/', protect, getLeaderboard);
+router.get('/', getLeaderboard);
 export default router;

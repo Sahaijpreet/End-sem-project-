@@ -4,6 +4,7 @@ import { Send, ArrowLeft, BookOpen, CheckCircle, Clock } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { getSocket } from '../hooks/useSocket';
 
 export default function Chat() {
   const { id } = useParams();
@@ -50,10 +51,17 @@ export default function Chat() {
       }
     }
     init();
-    const interval = setInterval(async () => {
-      await Promise.all([loadMessages(), loadConvo()]);
-    }, 5000);
-    return () => { cancelled = true; clearInterval(interval); };
+
+    const socket = getSocket();
+    socket.connect();
+    socket.emit('join_conversation', id);
+    socket.on('new_message', (msg) => setMessages((prev) => [...prev, msg]));
+
+    return () => {
+      cancelled = true;
+      socket.emit('leave_conversation', id);
+      socket.off('new_message');
+    };
   }, [id]);
 
   useEffect(() => {

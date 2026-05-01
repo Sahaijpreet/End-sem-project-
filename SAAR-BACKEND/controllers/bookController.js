@@ -7,8 +7,11 @@ import { sendEmail, bookRequestEmail, requestAcceptedEmail } from '../utils/emai
 export const listBook = async (req, res) => {
   try {
     const { Title, Author, Subject } = req.body;
+    if (!Title?.trim() || !Author?.trim() || !Subject?.trim()) {
+      return res.status(400).json({ success: false, message: 'Title, Author and Subject are required' });
+    }
     const CoverImage = req.file ? `/uploads/${req.file.filename}` : '';
-    const book = await Book.create({ Title, Author, Subject, CoverImage, OwnerID: req.user._id });
+    const book = await Book.create({ Title: Title.trim(), Author: Author.trim(), Subject: Subject.trim(), CoverImage, OwnerID: req.user._id });
     res.status(201).json({ success: true, data: book });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -17,16 +20,15 @@ export const listBook = async (req, res) => {
 
 export const getAvailableBooks = async (req, res) => {
   try {
-    const { subject } = req.query;
-    
-    let query = {};
+    const { subject, page = 1, limit = 20 } = req.query;
+    const query = {};
     if (subject) query.Subject = subject;
-
-    const books = await Book.find(query)
-      .populate('OwnerID', 'Name CollegeID')
-      .sort('-createdAt');
-      
-    res.status(200).json({ success: true, count: books.length, data: books });
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const [books, total] = await Promise.all([
+      Book.find(query).populate('OwnerID', 'Name CollegeID').sort('-createdAt').skip(skip).limit(parseInt(limit)),
+      Book.countDocuments(query),
+    ]);
+    res.status(200).json({ success: true, count: books.length, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)), data: books });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -35,37 +37,13 @@ export const getAvailableBooks = async (req, res) => {
 export const requestExchange = async (req, res) => {
   try {
     const bookId = req.params.id;
-    
     const book = await Book.findById(bookId);
-    if (!book) {
-      return res.status(404).json({ success: false, message: 'Book not found' });
-    }
-    
-    if (book.Status !== 'Available') {
-      return res.status(400).json({ success: false, message: 'Book is not available for exchange' });
-    }
-    
-    // Prevent owner from requesting their own book
-    if (book.OwnerID.toString() === req.user._id.toString()) {
-      return res.status(400).json({ success: false, message: 'You cannot request your own book' });
-    }
-
-    // Check if request already exists
-    const existingRequest = await ExchangeRequest.findOne({
-      BookID: bookId,
-      RequesterID: req.user._id
-    });
-    
-    if (existingRequest) {
-      return res.status(400).json({ success: false, message: 'You have already requested this book' });
-    }
-
-    const exchangeRequest = await ExchangeRequest.create({
-      BookID: bookId,
-      RequesterID: req.user._id
-    });
-    
-    // Update book status
+    if (!book) return res.status(404).json({ success: false, message: 'Book not found' });
+    if (book.Status !== 'Available') return res.status(400).json({ success: false, message: 'Book is not available for exchange' });
+    if (book.OwnerID.toString() === req.user._id.toString()) return res.status(400).json({ success: false, message: 'You cannot request your own book' });
+    const existingRequest = await ExchangeRequest.findOne({ BookID: bookId, RequesterID: req.user._id });
+    if (existingRequest) return res.status(400).json({ success: false, message: 'You have already requested this book' });
+    const exchangeRequest = await ExchangeRequest.create({ BookID: bookId, RequesterID: req.user._id });
     book.Status = 'Requested';
     await book.save();
     await createNotification(book.OwnerID, 'book_requested', `${req.user.Name || 'Someone'} requested your book "${book.Title}"`, '/book-exchange');
@@ -79,7 +57,6 @@ export const requestExchange = async (req, res) => {
 
 export const getMyRequests = async (req, res) => {
   try {
-    // Requests on books I own
     const myBooks = await Book.find({ OwnerID: req.user._id }).select('_id');
     const bookIds = myBooks.map((b) => b._id);
     const requests = await ExchangeRequest.find({ BookID: { $in: bookIds } })
@@ -94,16 +71,8 @@ export const getMyRequests = async (req, res) => {
 
 export const getMyOutgoingRequests = async (req, res) => {
   try {
-    // Requests I made on other people's books
     const requests = await ExchangeRequest.find({ RequesterID: req.user._id })
-      .populate({
-        path: 'BookID',
-        select: 'Title Author Subject Status',
-        populate: {
-          path: 'OwnerID',
-          select: 'Name Email'
-        }
-      })
+      .populate({ path: 'BookID', select: 'Title Author Subject Status', populate: { path: 'OwnerID', select: 'Name Email' } })
       .sort('-createdAt');
     res.json({ success: true, data: requests });
   } catch (error) {
@@ -114,36 +83,30 @@ export const getMyOutgoingRequests = async (req, res) => {
 export const cancelRequest = async (req, res) => {
   try {
     const request = await ExchangeRequest.findById(req.params.id).populate('BookID');
-    if (!request) {
-      return res.status(404).json({ success: false, message: 'Request not found' });
-    }
-    
-    // Only the requester can cancel their own request
-    if (request.RequesterID.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ success: false, message: 'Not authorized' });
-    }
-    
-    // Only allow canceling pending requests
-    if (request.Status !== 'Pending') {
-      return res.status(400).json({ success: false, message: 'Can only cancel pending requests' });
-    }
-    
-    // Delete the request and update book status back to Available
+    if (!request) return res.status(404).json({ success: false, message: 'Request not found' });
+    if (request.RequesterID.toString() !== req.user._id.toString()) return res.status(403).json({ success: false, message: 'Not authorized' });
+    if (request.Status !== 'Pending') return res.status(400).json({ success: false, message: 'Can only cancel pending requests' });
     await ExchangeRequest.findByIdAndDelete(req.params.id);
-    
-    // Check if there are other pending requests for this book
-    const otherRequests = await ExchangeRequest.find({ 
-      BookID: request.BookID._id, 
-      Status: 'Pending' 
-    });
-    
-    // If no other pending requests, set book back to Available
+    const otherRequests = await ExchangeRequest.find({ BookID: request.BookID._id, Status: 'Pending' });
     if (otherRequests.length === 0) {
       request.BookID.Status = 'Available';
       await request.BookID.save();
     }
-    
     res.json({ success: true, message: 'Request cancelled successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const deleteBook = async (req, res) => {
+  try {
+    const book = await Book.findById(req.params.id);
+    if (!book) return res.status(404).json({ success: false, message: 'Book not found' });
+    if (book.OwnerID.toString() !== req.user._id.toString() && req.user.Role !== 'Admin')
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    await ExchangeRequest.deleteMany({ BookID: book._id });
+    await book.deleteOne();
+    res.json({ success: true });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -151,7 +114,7 @@ export const cancelRequest = async (req, res) => {
 
 export const respondToRequest = async (req, res) => {
   try {
-    const { action } = req.body; // 'accept' | 'reject'
+    const { action } = req.body;
     const request = await ExchangeRequest.findById(req.params.id).populate('BookID');
     if (!request) return res.status(404).json({ success: false, message: 'Request not found' });
     if (request.BookID.OwnerID.toString() !== req.user._id.toString())

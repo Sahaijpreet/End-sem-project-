@@ -51,11 +51,13 @@ export const deleteNote = async (req, res) => {
 
 export const listUsers = async (req, res) => {
   try {
-    const users = await User.find()
-      .select('-PasswordHash')
-      .sort('-createdAt')
-      .limit(200);
-    res.status(200).json({ success: true, count: users.length, data: users });
+    const { page = 1, limit = 50 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const [users, total] = await Promise.all([
+      User.find().select('-PasswordHash').sort('-createdAt').skip(skip).limit(parseInt(limit)),
+      User.countDocuments(),
+    ]);
+    res.status(200).json({ success: true, count: users.length, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)), data: users });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

@@ -1,4 +1,5 @@
 import Note from '../models/Note.js';
+import Rating from '../models/Rating.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -32,17 +33,26 @@ export const uploadNote = async (req, res) => {
 
 export const getNotes = async (req, res) => {
   try {
-    const { subject, semester } = req.query;
-    
-    let query = {};
+    const { subject, semester, page = 1, limit = 20 } = req.query;
+    const query = {};
     if (subject) query.Subject = subject;
     if (semester) query.Semester = semester;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const [notes, total] = await Promise.all([
+      Note.find(query).populate('UploaderID', 'Name CollegeID').sort('-UploadDate').skip(skip).limit(parseInt(limit)),
+      Note.countDocuments(query),
+    ]);
 
-    const notes = await Note.find(query)
-      .populate('UploaderID', 'Name CollegeID')
-      .sort('-UploadDate');
-      
-    res.status(200).json({ success: true, count: notes.length, data: notes });
+    // Embed ratings in one aggregation instead of N per-card requests
+    const noteIds = notes.map((n) => n._id);
+    const ratingAgg = await Rating.aggregate([
+      { $match: { ResourceType: 'Note', ResourceID: { $in: noteIds } } },
+      { $group: { _id: '$ResourceID', avg: { $avg: '$Stars' }, count: { $sum: 1 } } },
+    ]);
+    const ratingMap = Object.fromEntries(ratingAgg.map((r) => [r._id.toString(), { avg: Math.round(r.avg * 10) / 10, count: r.count }]));
+    const data = notes.map((n) => ({ ...n.toObject(), rating: ratingMap[n._id.toString()] || { avg: 0, count: 0 } }));
+
+    res.status(200).json({ success: true, count: data.length, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)), data });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

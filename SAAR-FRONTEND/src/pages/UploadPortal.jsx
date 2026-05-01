@@ -1,91 +1,219 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UploadCloud, File, X, Info, ImagePlus } from 'lucide-react';
+import { UploadCloud, File, X, Info, ImagePlus, FileText, BookOpen, BookMarked } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 
-export default function UploadPortal() {
-  const [dragActive, setDragActive] = useState(false);
-  const [uploadedFile, setUploadedFile] = useState(null);
-  const [coverImage, setCoverImage] = useState(null);
-  const [coverPreview, setCoverPreview] = useState('');
-  const [title, setTitle] = useState('');
-  const [subject, setSubject] = useState('');
-  const [semester, setSemester] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const navigate = useNavigate();
+const TABS = [
+  { id: 'note', label: 'Notes', icon: FileText },
+  { id: 'pyq',  label: 'PYQ',   icon: BookMarked },
+  { id: 'book', label: 'Book',  icon: BookOpen },
+];
 
-  function handleCoverChange(e) {
+const SEMESTERS = [1,2,3,4,5,6,7,8];
+const EXAM_TYPES = ['End Semester', 'Mid Semester', 'Quiz', 'Other'];
+
+function FilePreview({ file }) {
+  const [previewUrl, setPreviewUrl] = useState(null);
+
+  useEffect(() => {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  if (!previewUrl) return null;
+
+  const isImage = file.type.startsWith('image/');
+  const isPdf = file.type === 'application/pdf';
+
+  if (isImage) return (
+    <div className="w-full h-64 rounded-xl overflow-hidden border border-parchment-200 bg-parchment-50">
+      <img src={previewUrl} alt="preview" className="w-full h-full object-contain" />
+    </div>
+  );
+
+  if (isPdf) return (
+    <div className="w-full h-64 rounded-xl overflow-hidden border border-parchment-200">
+      <iframe src={`${previewUrl}#page=1&toolbar=0&navpanes=0&scrollbar=0`} className="w-full h-full" title="PDF preview" />
+    </div>
+  );
+
+  return (
+    <div className="w-full h-32 rounded-xl border border-parchment-200 bg-parchment-50 flex flex-col items-center justify-center gap-2">
+      <File className="h-10 w-10 text-slate-400" />
+      <p className="text-sm text-ink-800 truncate max-w-xs px-4">{file.name}</p>
+      <p className="text-xs text-slate-400">Preview not available for this file type</p>
+    </div>
+  );
+}
+
+function FileDrop({ file, onFile, onClear, accept = '*/*', hint = 'PDF, Word, Image, PPT (max 25MB)' }) {
+  const [drag, setDrag] = useState(false);
+
+  function onDrag(e) {
+    e.preventDefault(); e.stopPropagation();
+    setDrag(e.type === 'dragenter' || e.type === 'dragover');
+  }
+  function onDrop(e) {
+    e.preventDefault(); e.stopPropagation();
+    setDrag(false);
+    const f = e.dataTransfer.files?.[0];
+    if (f) onFile(f);
+  }
+  function onChange(e) {
     const f = e.target.files?.[0];
-    if (!f) return;
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(f.type)) {
-      setError('Cover must be JPG, PNG or WEBP.'); return;
-    }
-    setCoverImage(f);
-    setCoverPreview(URL.createObjectURL(f));
+    if (f) onFile(f);
   }
 
-  const handleDrag = function (e) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true);
-    } else if (e.type === 'dragleave') {
-      setDragActive(false);
-    }
-  };
+  if (file) return (
+    <div className="space-y-3">
+      <FilePreview file={file} />
+      <div className="bg-white border border-emerald-200 rounded-xl p-3 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-lg flex items-center justify-center shrink-0">
+            <File className="h-4 w-4" />
+          </div>
+          <div>
+            <p className="font-medium text-ink-900 text-sm truncate max-w-xs">{file.name}</p>
+            <p className="text-xs text-emerald-600 font-medium">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
+          </div>
+        </div>
+        <button type="button" onClick={onClear} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
 
-  const handleDrop = function (e) {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const f = e.dataTransfer.files[0];
-      if (f.type !== 'application/pdf') {
-        setError('Only PDF files are allowed.');
-        return;
-      }
-      setUploadedFile(f);
-      setError('');
-    }
-  };
+  return (
+    <div
+      className={`relative border-2 border-dashed rounded-xl p-10 flex flex-col items-center justify-center transition-colors ${drag ? 'border-indigo-500 bg-indigo-50' : 'border-parchment-300 hover:border-indigo-400 bg-parchment-50 hover:bg-parchment-100'}`}
+      onDragEnter={onDrag} onDragLeave={onDrag} onDragOver={onDrag} onDrop={onDrop}
+    >
+      <input type="file" accept={accept} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={onChange} />
+      <div className="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center mb-4">
+        <UploadCloud className="h-8 w-8 text-accent-primary" />
+      </div>
+      <p className="text-lg font-medium text-ink-900 mb-1">Click to upload, or drag and drop</p>
+      <p className="text-sm text-ink-800">{hint}</p>
+    </div>
+  );
+}
 
-  const handleChange = function (e) {
-    e.preventDefault();
-    if (e.target.files && e.target.files[0]) {
-      const f = e.target.files[0];
-      if (f.type !== 'application/pdf') {
-        setError('Only PDF files are allowed.');
-        return;
-      }
-      setUploadedFile(f);
-      setError('');
+function CoverPicker({ preview, onChange, onClear }) {
+  if (preview) return (
+    <div className="relative w-24 h-32 rounded-lg overflow-hidden border border-parchment-200 shadow-sm">
+      <img src={preview} alt="cover" className="w-full h-full object-cover" />
+      <button type="button" onClick={onClear} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5">
+        <X className="h-3 w-3" />
+      </button>
+    </div>
+  );
+  return (
+    <label className="w-24 h-32 rounded-lg border-2 border-dashed border-parchment-300 hover:border-indigo-400 flex flex-col items-center justify-center cursor-pointer bg-parchment-50 hover:bg-parchment-100 transition-colors">
+      <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={onChange} />
+      <ImagePlus className="h-6 w-6 text-slate-400 mb-1" />
+      <span className="text-xs text-slate-400">Add cover</span>
+    </label>
+  );
+}
+
+const inputCls = 'w-full px-4 py-3 rounded-lg border border-parchment-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow text-ink-900 shadow-sm bg-white appearance-none';
+
+export default function UploadPortal() {
+  const navigate = useNavigate();
+  const [tab, setTab] = useState('note');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Note state
+  const [noteFile, setNoteFile] = useState(null);
+  const [noteCover, setNoteCover] = useState(null);
+  const [noteCoverPreview, setNoteCoverPreview] = useState('');
+  const [noteTitle, setNoteTitle] = useState('');
+  const [noteSubject, setNoteSubject] = useState('');
+  const [noteSemester, setNoteSemester] = useState('');
+
+  // PYQ state
+  const [pyqFile, setPyqFile] = useState(null);
+  const [pyqSubject, setPyqSubject] = useState('');
+  const [pyqDegree, setPyqDegree] = useState('');
+  const [pyqSemester, setPyqSemester] = useState('');
+  const [pyqYear, setPyqYear] = useState('');
+  const [pyqExamType, setPyqExamType] = useState('End Semester');
+
+  // Book state
+  const [bookCover, setBookCover] = useState(null);
+  const [bookCoverPreview, setBookCoverPreview] = useState('');
+  const [bookTitle, setBookTitle] = useState('');
+  const [bookAuthor, setBookAuthor] = useState('');
+  const [bookSubject, setBookSubject] = useState('');
+
+  function handleCover(file, setFile, setPreview) {
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setError('Cover must be JPG, PNG or WEBP.'); return;
     }
-  };
+    setFile(file);
+    setPreview(URL.createObjectURL(file));
+  }
+
+  function validateFile(file) {
+    if (file.size > 25 * 1024 * 1024) { setError('File must be under 25MB.'); return false; }
+    return true;
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!uploadedFile || !title.trim() || !subject || !semester) {
-      setError('Please fill title, subject, semester, and choose a PDF.');
-      return;
-    }
-    setLoading(true);
     setError('');
+    setLoading(true);
     try {
-      const fd = new FormData();
-      fd.append('document', uploadedFile);
-      if (coverImage) fd.append('cover', coverImage);
-      fd.append('Title', title.trim());
-      fd.append('Subject', subject);
-      fd.append('Semester', semester);
-      await apiFetch('/api/notes', { method: 'POST', body: fd });
-      navigate('/notes');
+      if (tab === 'note') {
+        if (!noteFile || !noteTitle.trim() || !noteSubject.trim() || !noteSemester)
+          throw new Error('Please fill all fields and choose a PDF.');
+        const fd = new FormData();
+        fd.append('document', noteFile);
+        if (noteCover) fd.append('cover', noteCover);
+        fd.append('Title', noteTitle.trim());
+        fd.append('Subject', noteSubject.trim());
+        fd.append('Semester', noteSemester);
+        await apiFetch('/api/notes', { method: 'POST', body: fd });
+        navigate('/notes');
+
+      } else if (tab === 'pyq') {
+        if (!pyqFile || !pyqSubject.trim() || !pyqSemester || !pyqYear)
+          throw new Error('Please fill all fields and choose a file.');
+        const fd = new FormData();
+        fd.append('document', pyqFile);
+        fd.append('Title', pyqSubject.trim());
+        fd.append('Subject', pyqSubject.trim());
+        fd.append('Degree', pyqDegree.trim());
+        fd.append('Semester', pyqSemester);
+        fd.append('Year', pyqYear);
+        fd.append('ExamType', pyqExamType);
+        await apiFetch('/api/pyqs', { method: 'POST', body: fd });
+        navigate('/pyqs');
+
+      } else {
+        if (!bookTitle.trim() || !bookAuthor.trim() || !bookSubject.trim())
+          throw new Error('Please fill Title, Author and Subject.');
+        const fd = new FormData();
+        fd.append('Title', bookTitle.trim());
+        fd.append('Author', bookAuthor.trim());
+        fd.append('Subject', bookSubject.trim());
+        if (bookCover) fd.append('cover', bookCover);
+        await apiFetch('/api/books', { method: 'POST', body: fd });
+        navigate('/book-exchange');
+      }
     } catch (err) {
       setError(err.message || 'Upload failed');
     } finally {
       setLoading(false);
     }
   }
+
+  const submitLabel = { note: 'Publish Notes', pyq: 'Publish PYQ', book: 'List Book' };
+  const canSubmit = tab === 'note' ? !!noteFile : tab === 'pyq' ? !!pyqFile : true;
 
   return (
     <div className="flex-1 bg-parchment-50 py-12 min-h-[calc(100vh-4rem)]">
@@ -94,17 +222,28 @@ export default function UploadPortal() {
         <div className="text-center mb-10">
           <h1 className="text-3xl font-bold text-ink-900">Contribute to the Community</h1>
           <p className="mt-3 text-lg text-ink-800 max-w-2xl mx-auto">
-            Upload your class notes as a PDF. They will appear in the repository for other students.
+            Upload notes, past year questions, or list a book for exchange.
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-parchment-200 overflow-hidden">
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6">
+          {TABS.map(({ id, label, icon: Icon }) => (
+            <button key={id} type="button" onClick={() => { setTab(id); setError(''); }}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${tab === id ? 'bg-accent-primary text-white shadow-sm' : 'bg-white border border-parchment-200 text-ink-800 hover:bg-parchment-50'}`}>
+              <Icon className="h-4 w-4" /> {label}
+            </button>
+          ))}
+        </div>
 
+        <div className="bg-white rounded-2xl shadow-sm border border-parchment-200 overflow-hidden">
           <div className="bg-indigo-50 border-b border-indigo-100 p-4 flex items-start gap-3">
             <Info className="h-5 w-5 text-accent-primary shrink-0 mt-0.5" />
             <div className="text-sm text-accent-primary">
               <strong className="block mb-1">Upload Guidelines</strong>
-              PDF only (max 10MB on server). Tag clearly by subject and semester. Avoid copyrighted material without permission.
+              {tab === 'book'
+                ? 'List a physical book you own and are willing to exchange with other students.'
+                : 'Any file up to 25MB. Tag clearly by subject and semester. Avoid copyrighted material without permission.'}
             </div>
           </div>
 
@@ -115,148 +254,120 @@ export default function UploadPortal() {
           <div className="p-8">
             <form className="space-y-8" onSubmit={handleSubmit}>
 
-              <div>
-                <label className="block text-sm font-semibold text-ink-900 mb-3">Upload File (PDF)</label>
-                {!uploadedFile ? (
-                  <div
-                    className={`relative border-2 border-dashed rounded-xl p-10 flex flex-col items-center justify-center transition-colors ${
-                      dragActive ? 'border-indigo-500 bg-indigo-50' : 'border-parchment-300 hover:border-indigo-400 bg-parchment-50 hover:bg-parchment-100'
-                    }`}
-                    onDragEnter={handleDrag}
-                    onDragLeave={handleDrag}
-                    onDragOver={handleDrag}
-                    onDrop={handleDrop}
-                  >
-                    <input
-                      type="file"
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      onChange={handleChange}
-                      accept=".pdf,application/pdf"
-                    />
-                    <div className="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center mb-4">
-                      <UploadCloud className="h-8 w-8 text-accent-primary" />
-                    </div>
-                    <p className="text-lg font-medium text-ink-900 mb-1">Click to upload, or drag and drop</p>
-                    <p className="text-sm text-ink-800">PDF (max 10MB)</p>
+              {/* ── NOTES ── */}
+              {tab === 'note' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-ink-900 mb-3">Upload File (PDF)</label>
+                    <FileDrop file={noteFile}
+                      onFile={(f) => { if (validateFile(f)) { setNoteFile(f); setError(''); } }}
+                      onClear={() => setNoteFile(null)} />
                   </div>
-                ) : (
-                  <div className="bg-white border text-ink-900 rounded-xl p-4 flex items-center justify-between border-emerald-200 shadow-sm">
+                  <div>
+                    <label className="block text-sm font-semibold text-ink-900 mb-3">Cover Image <span className="text-slate-400 font-normal">(optional)</span></label>
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-lg flex items-center justify-center">
-                        <File className="h-6 w-6" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-ink-900 truncate max-w-xs">{uploadedFile.name}</p>
-                        <p className="text-sm text-ink-800 text-emerald-600/80 font-medium">
-                          {(uploadedFile.size / (1024 * 1024)).toFixed(2)} MB
-                        </p>
-                      </div>
+                      <CoverPicker preview={noteCoverPreview}
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleCover(f, setNoteCover, setNoteCoverPreview); }}
+                        onClear={() => { setNoteCover(null); setNoteCoverPreview(''); }} />
+                      <p className="text-xs text-ink-800">JPG, PNG or WEBP</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setUploadedFile(null)}
-                      className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Remove file"
-                    >
-                      <X className="h-5 w-5" />
-                    </button>
                   </div>
-                )}
-              </div>
-
-              {/* Cover image */}
-              <div>
-                <label className="block text-sm font-semibold text-ink-900 mb-3">Cover Image <span className="text-slate-400 font-normal">(optional)</span></label>
-                <div className="flex items-center gap-4">
-                  {coverPreview ? (
-                    <div className="relative w-24 h-32 rounded-lg overflow-hidden border border-parchment-200 shadow-sm">
-                      <img src={coverPreview} alt="cover" className="w-full h-full object-cover" />
-                      <button type="button" onClick={() => { setCoverImage(null); setCoverPreview(''); }}
-                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5">
-                        <X className="h-3 w-3" />
-                      </button>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-parchment-200">
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold text-ink-900 mb-2">Title</label>
+                      <input className={inputCls} value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} placeholder="e.g. Linear Algebra Formula Sheet" required />
                     </div>
-                  ) : (
-                    <label className="w-24 h-32 rounded-lg border-2 border-dashed border-parchment-300 hover:border-indigo-400 flex flex-col items-center justify-center cursor-pointer bg-parchment-50 hover:bg-parchment-100 transition-colors">
-                      <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleCoverChange} />
-                      <ImagePlus className="h-6 w-6 text-slate-400 mb-1" />
-                      <span className="text-xs text-slate-400">Add cover</span>
-                    </label>
-                  )}
-                  <p className="text-xs text-ink-800">JPG, PNG or WEBP · max 5MB<br />Recommended: portrait ratio (3:4)</p>
-                </div>
-              </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ink-900 mb-2">Subject</label>
+                      <input className={inputCls} value={noteSubject} onChange={(e) => setNoteSubject(e.target.value)} placeholder="e.g. Data Structures, Thermodynamics…" required />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ink-900 mb-2">Semester</label>
+                      <select className={inputCls} value={noteSemester} onChange={(e) => setNoteSemester(e.target.value)} required>
+                        <option value="">Select a semester</option>
+                        {SEMESTERS.map((s) => <option key={s} value={s}>Semester {s}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </>
+              )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-parchment-200">
-                <div className="md:col-span-2">
-                  <label htmlFor="title" className="block text-sm font-semibold text-ink-900 mb-2">Title</label>
-                  <input
-                    type="text"
-                    id="title"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    className="w-full px-4 py-3 rounded-lg border border-parchment-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow text-ink-900 shadow-sm"
-                    placeholder="e.g. Linear Algebra Midterm Formula Sheet"
-                    required
-                  />
-                </div>
+              {/* ── PYQ ── */}
+              {tab === 'pyq' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-ink-900 mb-3">Upload File</label>
+                    <FileDrop file={pyqFile}
+                      onFile={(f) => { if (validateFile(f)) { setPyqFile(f); setError(''); } }}
+                      onClear={() => setPyqFile(null)} />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-parchment-200">
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold text-ink-900 mb-2">Subject</label>
+                      <input className={inputCls} value={pyqSubject} onChange={(e) => setPyqSubject(e.target.value)} placeholder="e.g. Operating Systems, Data Structures…" required />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold text-ink-900 mb-2">Degree <span className="text-slate-400 font-normal">(optional)</span></label>
+                      <input className={inputCls} value={pyqDegree} onChange={(e) => setPyqDegree(e.target.value)} placeholder="e.g. B.Tech, BCA, MCA, MBA…" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold text-ink-900 mb-2">Exam Year</label>
+                      <input className={inputCls} type="number" min="2000" max={new Date().getFullYear()} value={pyqYear} onChange={(e) => setPyqYear(e.target.value)} placeholder="e.g. 2023" required />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ink-900 mb-2">Semester</label>
+                      <select className={inputCls} value={pyqSemester} onChange={(e) => setPyqSemester(e.target.value)} required>
+                        <option value="">Select a semester</option>
+                        {SEMESTERS.map((s) => <option key={s} value={s}>Semester {s}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ink-900 mb-2">Exam Type</label>
+                      <select className={inputCls} value={pyqExamType} onChange={(e) => setPyqExamType(e.target.value)}>
+                        {EXAM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </>
+              )}
 
-                <div>
-                  <label htmlFor="subject" className="block text-sm font-semibold text-ink-900 mb-2">Subject</label>
-                  <select
-                    id="subject"
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    className="w-full px-4 py-3 rounded-lg border border-parchment-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow text-ink-900 bg-white shadow-sm appearance-none"
-                    required
-                  >
-                    <option value="">Select a subject</option>
-                    <option value="Computer Science">Computer Science</option>
-                    <option value="Mathematics">Mathematics</option>
-                    <option value="Physics">Physics</option>
-                    <option value="Chemistry">Chemistry</option>
-                    <option value="Biology">Biology</option>
-                    <option value="Economics">Economics</option>
-                    <option value="History">History</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="semester" className="block text-sm font-semibold text-ink-900 mb-2">Semester</label>
-                  <select
-                    id="semester"
-                    value={semester}
-                    onChange={(e) => setSemester(e.target.value)}
-                    className="w-full px-4 py-3 rounded-lg border border-parchment-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow text-ink-900 bg-white shadow-sm appearance-none"
-                    required
-                  >
-                    <option value="">Select a semester</option>
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
-                      <option key={s} value={String(s)}>Semester {s}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              {/* ── BOOK ── */}
+              {tab === 'book' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-ink-900 mb-3">Cover Image <span className="text-slate-400 font-normal">(optional)</span></label>
+                    <div className="flex items-center gap-4">
+                      <CoverPicker preview={bookCoverPreview}
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleCover(f, setBookCover, setBookCoverPreview); }}
+                        onClear={() => { setBookCover(null); setBookCoverPreview(''); }} />
+                      <p className="text-xs text-ink-800">JPG, PNG or WEBP</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-parchment-200">
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold text-ink-900 mb-2">Book Title</label>
+                      <input className={inputCls} value={bookTitle} onChange={(e) => setBookTitle(e.target.value)} placeholder="e.g. Introduction to Algorithms" required />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ink-900 mb-2">Author</label>
+                      <input className={inputCls} value={bookAuthor} onChange={(e) => setBookAuthor(e.target.value)} placeholder="e.g. Cormen, Leiserson" required />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ink-900 mb-2">Subject</label>
+                      <input className={inputCls} value={bookSubject} onChange={(e) => setBookSubject(e.target.value)} placeholder="e.g. Algorithms, Physics" required />
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className="pt-6 flex items-center justify-end gap-4 border-t border-parchment-200">
-                <button
-                  type="button"
-                  onClick={() => navigate(-1)}
-                  className="px-6 py-3 border border-parchment-300 rounded-lg text-ink-800 font-medium hover:bg-parchment-50 transition-colors"
-                >
+                <button type="button" onClick={() => navigate(-1)}
+                  className="px-6 py-3 border border-parchment-300 rounded-lg text-ink-800 font-medium hover:bg-parchment-50 transition-colors">
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={!uploadedFile || loading}
-                  className={`px-8 py-3 rounded-lg text-white font-semibold transition-all shadow-sm ${
-                    uploadedFile && !loading
-                      ? 'bg-accent-primary hover:bg-accent-hover shadow-md hover:shadow-lg'
-                      : 'bg-indigo-300 cursor-not-allowed'
-                  }`}
-                >
-                  {loading ? 'Publishing…' : 'Publish Notes'}
+                <button type="submit" disabled={!canSubmit || loading}
+                  className={`px-8 py-3 rounded-lg text-white font-semibold transition-all shadow-sm ${canSubmit && !loading ? 'bg-accent-primary hover:bg-accent-hover shadow-md' : 'bg-indigo-300 cursor-not-allowed'}`}>
+                  {loading ? 'Publishing…' : submitLabel[tab]}
                 </button>
               </div>
             </form>

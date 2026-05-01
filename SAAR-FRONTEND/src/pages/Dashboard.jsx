@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { FileText, BookOpen, BookMarked, Shield, Download, Bookmark, Clock, HelpCircle, Users, Calculator, ClipboardList, Layers } from 'lucide-react';
+import { FileText, BookOpen, BookMarked, Shield, Bookmark, Clock, HelpCircle, Users, Calculator, ClipboardList, Layers } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useReveal } from '../hooks/useReveal';
@@ -115,15 +115,6 @@ export default function Dashboard() {
             <div>
               <div className="text-2xl font-bold text-ink-900">{loading ? '…' : (bookmarks.notes?.length || 0) + (bookmarks.pyqs?.length || 0)}</div>
               <div className="text-sm text-ink-800 font-medium">Bookmarks</div>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border border-parchment-200 p-6 flex items-center">
-            <div className="bg-emerald-100 text-emerald-600 p-4 rounded-lg mr-4">
-              <Download className="h-6 w-6" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-ink-900">{loading ? '…' : myNotes.reduce((s, n) => s + (n.Downloads || 0), 0)}</div>
-              <div className="text-sm text-ink-800 font-medium">Total downloads</div>
             </div>
           </div>
         </div>

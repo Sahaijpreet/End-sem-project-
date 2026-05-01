@@ -64,7 +64,7 @@ export default function UserProfile() {
       setFollowing(r.data.following);
       setData((d) => ({ ...d, followersCount: d.followersCount + (r.data.following ? 1 : -1) }));
       toast(r.data.following ? 'Following!' : 'Unfollowed.');
-    } catch (e) { toast(e.message, 'error'); }
+    } catch (err) { toast(err.message, 'error'); }
     finally { setToggling(false); }
   }
 
@@ -140,7 +140,7 @@ export default function UserProfile() {
                 <div key={n._id} className="px-6 py-4 flex justify-between items-center gap-4">
                   <div className="min-w-0">
                     <p className="font-medium text-ink-900 truncate">{n.Title}</p>
-                    <p className="text-sm text-ink-800">{n.Subject} · Sem {n.Semester} · {n.Downloads ?? 0} downloads</p>
+                    <p className="text-sm text-ink-800">{n.Subject} · Sem {n.Semester}</p>
                   </div>
                   <Link to={`/notes/${n._id}`} className="shrink-0 flex items-center gap-1 text-xs text-accent-primary hover:underline">
                     <ExternalLink className="h-3.5 w-3.5" /> View

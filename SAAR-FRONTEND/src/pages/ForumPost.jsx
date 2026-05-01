@@ -30,7 +30,7 @@ export default function ForumPost() {
       setPost((p) => ({ ...p, Answers: [...p.Answers, r.data] }));
       setAnswerText('');
       toast('Answer posted!');
-    } catch (e) { toast(e.message, 'error'); }
+    } catch (err) { toast(err.message, 'error'); }
     finally { setSubmitting(false); }
   }
 
@@ -39,7 +39,7 @@ export default function ForumPost() {
     try {
       const r = await apiFetch(`/api/forum/${id}/answers/${answerId}/upvote`, { method: 'POST', body: JSON.stringify({}) });
       setPost((p) => ({ ...p, Answers: p.Answers.map((a) => a._id === answerId ? { ...a, Upvotes: Array(r.data.upvotes).fill(null), _upvoted: r.data.upvoted } : a) }));
-    } catch (e) { toast(e.message, 'error'); }
+    } catch (err) { toast(err.message, 'error'); }
   }
 
   async function accept(answerId) {
@@ -47,7 +47,7 @@ export default function ForumPost() {
       await apiFetch(`/api/forum/${id}/answers/${answerId}/accept`, { method: 'POST', body: JSON.stringify({}) });
       setPost((p) => ({ ...p, Solved: true, Answers: p.Answers.map((a) => ({ ...a, IsAccepted: a._id === answerId })) }));
       toast('Answer accepted!');
-    } catch (e) { toast(e.message, 'error'); }
+    } catch (err) { toast(err.message, 'error'); }
   }
 
   async function deletePost() {
@@ -55,7 +55,7 @@ export default function ForumPost() {
     try {
       await apiFetch(`/api/forum/${id}`, { method: 'DELETE' });
       window.history.back();
-    } catch (e) { toast(e.message, 'error'); }
+    } catch (err) { toast(err.message, 'error'); }
   }
 
   if (loading) return <div className="flex-1 flex items-center justify-center"><p className="text-ink-800">Loading…</p></div>;

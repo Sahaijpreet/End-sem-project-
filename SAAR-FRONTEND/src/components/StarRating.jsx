@@ -4,14 +4,14 @@ import { apiFetch } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
-export default function StarRating({ resourceType, resourceId }) {
+export default function StarRating({ resourceType, resourceId, initialData }) {
   const { isAuthenticated } = useAuth();
   const toast = useToast();
-  const [data, setData] = useState({ avg: 0, count: 0, userRating: null });
+  const [data, setData] = useState(initialData || { avg: 0, count: 0, userRating: null });
   const [hover, setHover] = useState(0);
 
   useEffect(() => {
-    if (!resourceId) return;
+    if (!resourceId || initialData) return;
     apiFetch(`/api/ratings/${resourceType}/${resourceId}`, { skipAuth: true })
       .then((r) => r.success && setData(r.data))
       .catch(() => {});

@@ -17,20 +17,14 @@ const storage = multer.diskStorage({
   }
 });
 
-// File Validation: Only allow PDFs
-const fileFilter = (req, file, cb) => {
-  if (file.mimetype === 'application/pdf') {
-    cb(null, true);
-  } else {
-    cb(new Error('Invalid file type! Only PDF files are allowed.'), false);
-  }
-};
+// Allow any file type for documents
+const fileFilter = (req, file, cb) => cb(null, true);
 
 const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024 // Limit to 10MB
+    fileSize: 25 * 1024 * 1024 // 25MB
   }
 });
 

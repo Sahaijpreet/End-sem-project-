@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { Search, Filter, ChevronDown, BookMarked, UploadCloud, X, File, Download, Bookmark, BookmarkCheck, MessageSquare } from 'lucide-react';
+import { Search, Filter, ChevronDown, BookMarked, UploadCloud, X, File, Download, Bookmark, BookmarkCheck, MessageSquare, Trash2 } from 'lucide-react';
 import { apiFetch, fileUrl } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -14,7 +15,7 @@ const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 10 }, (_, i) => CURRENT_YEAR - i);
 
 export default function PYQRepository() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const toast = useToast();
 
   const [pyqs, setPyqs] = useState([]);
@@ -36,6 +37,7 @@ export default function PYQRepository() {
   const [year, setYear] = useState('');
   const [examType, setExamType] = useState('End Semester');
   const [uploading, setUploading] = useState(false);
+  const [degree, setDegree] = useState('');
 
   useReveal('.reveal, .reveal-left, .reveal-scale', [pyqs]);
 
@@ -83,6 +85,15 @@ export default function PYQRepository() {
     } catch (e) { toast(e.message, 'error'); }
   }
 
+  async function handleDeletePYQ(id) {
+    if (!window.confirm('Delete this PYQ? This cannot be undone.')) return;
+    try {
+      await apiFetch(`/api/pyqs/${id}`, { method: 'DELETE' });
+      setPyqs((prev) => prev.filter((p) => p._id !== id));
+      toast('PYQ deleted.');
+    } catch (err) { toast(err.message || 'Failed to delete.', 'error'); }
+  }
+
   function handleDownload(id, href) {
     apiFetch(`/api/pyqs/${id}/download`, { method: 'POST', body: JSON.stringify({}) }).catch(() => {});
     window.open(href, '_blank');
@@ -97,34 +108,35 @@ export default function PYQRepository() {
     e.preventDefault(); e.stopPropagation();
     setDragActive(false);
     const f = e.dataTransfer.files?.[0];
-    if (f?.type !== 'application/pdf') { toast('Only PDF files allowed.', 'error'); return; }
+    if (!f) return;
     setFile(f);
   }
 
   function handleFileChange(e) {
     const f = e.target.files?.[0];
-    if (f?.type !== 'application/pdf') { toast('Only PDF files allowed.', 'error'); return; }
+    if (!f) return;
     setFile(f);
   }
 
   async function handleUpload(e) {
     e.preventDefault();
-    if (!file || !title.trim() || !subject || !semester || !year) {
-      toast('Please fill all fields and choose a PDF.', 'error'); return;
+    if (!file || !subject.trim() || !semester || !year) {
+      toast('Please fill all fields and choose a file.', 'error'); return;
     }
     setUploading(true);
     try {
       const fd = new FormData();
       fd.append('document', file);
-      fd.append('Title', title.trim());
-      fd.append('Subject', subject);
+      fd.append('Title', title.trim() || subject.trim());
+      fd.append('Subject', subject.trim());
+      fd.append('Degree', degree.trim());
       fd.append('Semester', semester);
       fd.append('Year', year);
       fd.append('ExamType', examType);
       await apiFetch('/api/pyqs', { method: 'POST', body: fd });
       toast('PYQ uploaded successfully!');
       setUploadOpen(false);
-      setFile(null); setTitle(''); setSubject(''); setSemester(''); setYear(''); setExamType('End Semester');
+      setFile(null); setTitle(''); setSubject(''); setDegree(''); setSemester(''); setYear(''); setExamType('End Semester');
       await loadPYQs();
     } catch (err) { toast(err.message || 'Upload failed', 'error'); }
     finally { setUploading(false); }
@@ -134,8 +146,8 @@ export default function PYQRepository() {
     <div className="flex-1 bg-parchment-50 min-h-[calc(100vh-4rem)] flex flex-col md:flex-row">
 
       {/* Sidebar filters */}
-      <aside className="w-full md:w-64 lg:w-72 bg-white border-r border-parchment-200 flex-shrink-0">
-        <div className="p-6 sticky top-0 max-h-screen overflow-y-auto">
+      <aside className="w-full md:w-52 bg-white border-r border-parchment-200 flex-shrink-0">
+        <div className="p-5 sticky top-0 max-h-screen overflow-y-auto">
           <div className="flex items-center gap-2 mb-6 text-ink-900">
             <Filter className="h-5 w-5" />
             <h2 className="text-lg font-bold">Filters</h2>
@@ -189,38 +201,29 @@ export default function PYQRepository() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 p-6 lg:p-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+      <main className="flex-1 p-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4 animate-[fadeSlideDown_0.4s_ease_both] bg-white border border-parchment-200 rounded-xl px-5 py-4 shadow-sm">
           <div>
             <h1 className="text-2xl font-bold text-ink-900 flex items-center gap-2">
               <BookMarked className="h-6 w-6 text-accent-primary" /> PYQ Repository
             </h1>
-            <p className="text-ink-800 text-sm mt-1">Browse previous year question papers shared by peers.</p>
+            <p className="text-ink-800 text-sm mt-0.5">Browse previous year question papers shared by peers.</p>
           </div>
-          <div className="flex gap-3 items-center">
-            <div className="relative w-full md:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search by title or subject..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-parchment-300 rounded-lg text-sm bg-white focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => isAuthenticated ? setUploadOpen(true) : toast('Log in to upload PYQs.', 'error')}
-              className="flex items-center gap-2 bg-accent-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-accent-hover transition-all shadow-sm whitespace-nowrap"
-            >
-              <UploadCloud className="h-4 w-4" /> Upload PYQ
-            </button>
+          <div className="relative w-full md:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by title or subject..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="block w-full pl-10 pr-3 py-2 border border-parchment-300 rounded-lg text-sm bg-parchment-50 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+            />
           </div>
         </div>
 
-        <p className="text-sm text-ink-800 mb-6">{loading ? 'Loading…' : `Showing ${filtered.length} results`}</p>
+        <div className="mb-4 text-sm text-ink-800 animate-[fadeIn_0.5s_ease_both]">{loading ? 'Loading…' : `Showing ${filtered.length} results`}</div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {!loading && filtered.length === 0 && (
             <p className="text-ink-800 col-span-full">No PYQs found. Be the first to upload one!</p>
           )}
@@ -228,43 +231,44 @@ export default function PYQRepository() {
             const pdfHref = fileUrl(pyq.FileURL);
             return (
               <div key={pyq._id} className={`card-hover bg-white rounded-xl shadow-sm border border-parchment-200 overflow-hidden flex flex-col`}>
-                {pyq.CoverImage && (
-                  <div className="h-36 w-full overflow-hidden">
-                    <img src={pyq.CoverImage} alt="cover" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                  </div>
-                )}
-                <div className="p-5 flex-1">
-                  <div className="flex justify-between items-start mb-3">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-accent-primary">
-                      {pyq.Subject}
-                    </span>
+                <div className="h-36 w-full overflow-hidden bg-parchment-100 border-b border-parchment-200">
+                  {(() => {
+                    const href = fileUrl(pyq.FileURL);
+                    const isImage = pyq.FileURL && /\.(jpg|jpeg|png|webp|gif)$/i.test(pyq.FileURL);
+                    const isPdf = pyq.FileURL && pyq.FileURL.toLowerCase().endsWith('.pdf');
+                    if (pyq.CoverImage) return <img src={fileUrl(pyq.CoverImage)} alt="cover" className="w-full h-full object-cover" />;
+                    if (isImage) return <img src={href} alt="preview" className="w-full h-full object-cover" />;
+                    if (isPdf) return <iframe src={`${href}#page=1&toolbar=0&navpanes=0&scrollbar=0`} className="w-full h-full pointer-events-none" title="preview" />;
+                    return <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-slate-400"><Download className="h-7 w-7" /><span className="text-xs">{pyq.FileURL?.split('.').pop()?.toUpperCase() || 'FILE'}</span></div>;
+                  })()}
+                </div>
+                <div className="px-3 pt-2 pb-1 flex-1">
+                  <div className="flex justify-between items-start mb-0.5">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-ink-900">{pyq.Subject}</span>
                     <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
                       pyq.ExamType === 'End Semester' ? 'bg-rose-100 text-rose-700' :
                       pyq.ExamType === 'Mid Semester' ? 'bg-amber-100 text-amber-700' :
                       'bg-slate-100 text-slate-600'
                     }`}>{pyq.ExamType}</span>
                   </div>
-                  <h3 className="text-lg font-bold text-ink-900 mb-2 line-clamp-2">{pyq.Title}</h3>
-                  <div className="flex items-center gap-3 text-sm text-ink-800">
-                    <span>Sem {pyq.Semester}</span>
-                    <span>·</span>
-                    <span>{pyq.Year}</span>
+                  {pyq.Title !== pyq.Subject && <h3 className="text-sm font-bold text-ink-900 mb-0 line-clamp-2">{pyq.Title}</h3>}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs text-ink-800 pl-1">
+                      <span>Sem {pyq.Semester}</span>
+                      <span>·</span>
+                      <span>{pyq.Year}</span>
+                    </div>
+                    <span className="text-[11px] text-ink-900 pr-1">
+                      By {pyq.UploaderID?._id ? (
+                        <Link to={`/user/${pyq.UploaderID._id}`} className="hover:text-accent-primary hover:underline font-medium">
+                          {pyq.UploaderID.Name || 'Student'}
+                        </Link>
+                      ) : 'Student'}
+                    </span>
                   </div>
-                  <p className="text-xs text-ink-800 mt-3">
-                    By {pyq.UploaderID?._id ? (
-                      <Link to={`/user/${pyq.UploaderID._id}`} className="hover:text-accent-primary hover:underline font-medium">
-                        {pyq.UploaderID.Name || 'Student'}
-                      </Link>
-                    ) : (
-                      'Student'
-                    )}
-                  </p>
                 </div>
-                <div className="px-5 py-3">
-                  <StarRating resourceType="PYQ" resourceId={pyq._id} />
-                  <div className="flex gap-3 mt-1 text-xs text-ink-800">
-                    <span>{pyq.Downloads ?? 0} downloads</span>
-                  </div>
+                <div className="px-3 pb-2">
+                  <StarRating resourceType="PYQ" resourceId={pyq._id} initialData={pyq.rating} />
                 </div>
                 <div className="bg-parchment-50 px-5 py-3 border-t border-parchment-200 flex gap-1.5 flex-wrap">
                   {isAuthenticated ? (
@@ -283,6 +287,12 @@ export default function PYQRepository() {
                         className="flex items-center justify-center py-2 px-3 border border-parchment-300 rounded-lg text-sm text-ink-800 bg-white hover:bg-parchment-50">
                         <MessageSquare className="h-4 w-4" />
                       </button>
+                      {pyq.UploaderID?._id === user?._id && (
+                        <button type="button" onClick={() => handleDeletePYQ(pyq._id)}
+                          className="flex items-center justify-center py-2 px-3 border border-rose-200 rounded-lg text-sm text-rose-600 bg-white hover:bg-rose-50 transition-colors">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </>
                   ) : (
                     <Link to="/auth" state={{ mode: 'login' }}
@@ -306,8 +316,8 @@ export default function PYQRepository() {
       </main>
 
       {/* Upload modal */}
-      {uploadOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      {uploadOpen && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={(e) => e.target === e.currentTarget && setUploadOpen(false)}>
           <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-5">
               <h2 className="text-lg font-bold text-ink-900">Upload PYQ</h2>
@@ -322,10 +332,11 @@ export default function PYQRepository() {
                   }`}
                   onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop}
                 >
-                  <input type="file" accept=".pdf,application/pdf" onChange={handleFileChange}
+                  <input type="file" accept="*/*" onChange={handleFileChange}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                   <UploadCloud className="h-8 w-8 text-accent-primary mb-2" />
-                  <p className="text-sm font-medium text-ink-900">Click or drag & drop PDF</p>
+                  <p className="text-sm font-medium text-ink-900">Click or drag & drop any file</p>
+                  <p className="text-xs text-ink-800 mt-1">PDF, Word, Image, PPT (max 25MB)</p>
                 </div>
               ) : (
                 <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-xl p-3">
@@ -340,38 +351,46 @@ export default function PYQRepository() {
               <div>
                 <label className="block text-sm font-semibold text-ink-900 mb-1">Title</label>
                 <input required value={title} onChange={(e) => setTitle(e.target.value)}
-                  className="w-full border border-parchment-300 rounded-lg px-3 py-2 text-sm" placeholder="e.g. Data Structures End Sem 2023" />
+                  className="w-full border border-parchment-300 rounded-lg px-3 py-2 text-sm text-ink-900"
+                  placeholder="e.g. Mid Sem 2023 Question Paper…" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-ink-900 mb-1">Subject</label>
+                <input required value={subject} onChange={(e) => setSubject(e.target.value)}
+                  className="w-full border border-parchment-300 rounded-lg px-3 py-2 text-sm text-ink-900"
+                  placeholder="e.g. Data Structures, Operating Systems…" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-ink-900 mb-1">Degree <span className="text-slate-400 font-normal text-xs">(optional)</span></label>
+                <input value={degree} onChange={(e) => setDegree(e.target.value)}
+                  className="w-full border border-parchment-300 rounded-lg px-3 py-2 text-sm text-ink-900"
+                  placeholder="e.g. B.Tech, BCA, MCA, MBA…" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-ink-900 mb-1">Year</label>
+                <select required value={year} onChange={(e) => setYear(e.target.value)}
+                  className="w-full border border-parchment-300 rounded-lg px-3 py-2 text-sm text-ink-900 bg-white">
+                  <option value="">Select year</option>
+                  {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-semibold text-ink-900 mb-1">Subject</label>
-                  <select required value={subject} onChange={(e) => setSubject(e.target.value)}
-                    className="w-full border border-parchment-300 rounded-lg px-3 py-2 text-sm bg-white">
-                    <option value="">Select</option>
-                    {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
                   <label className="block text-sm font-semibold text-ink-900 mb-1">Semester</label>
                   <select required value={semester} onChange={(e) => setSemester(e.target.value)}
-                    className="w-full border border-parchment-300 rounded-lg px-3 py-2 text-sm bg-white">
+                    className="w-full border border-parchment-300 rounded-lg px-3 py-2 text-sm text-ink-900 bg-white">
                     <option value="">Select</option>
                     {[1,2,3,4,5,6,7,8].map((s) => <option key={s} value={s}>Sem {s}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-ink-900 mb-1">Year</label>
-                  <select required value={year} onChange={(e) => setYear(e.target.value)}
-                    className="w-full border border-parchment-300 rounded-lg px-3 py-2 text-sm bg-white">
-                    <option value="">Select</option>
-                    {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
-                  </select>
-                </div>
-                <div>
                   <label className="block text-sm font-semibold text-ink-900 mb-1">Exam Type</label>
                   <select value={examType} onChange={(e) => setExamType(e.target.value)}
-                    className="w-full border border-parchment-300 rounded-lg px-3 py-2 text-sm bg-white">
+                    className="w-full border border-parchment-300 rounded-lg px-3 py-2 text-sm text-ink-900 bg-white">
                     {EXAM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
@@ -388,7 +407,7 @@ export default function PYQRepository() {
             </form>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   );
 }

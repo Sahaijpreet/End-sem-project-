@@ -58,6 +58,8 @@ export default function Notifications() {
 
   useEffect(() => {
     loadNotifications();
+    // Auto mark all as read when page opens
+    apiFetch('/api/notifications/mark-all-read', { method: 'PATCH' }).catch(() => {});
   }, []);
 
   async function markAsRead(id) {

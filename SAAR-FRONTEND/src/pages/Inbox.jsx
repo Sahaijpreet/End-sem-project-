@@ -22,6 +22,11 @@ export default function Inbox() {
         if (notifRes.success) {
           setNotifications(notifRes.data);
           setUnreadCount(notifRes.unreadCount);
+          // Auto mark all as read after fetching
+          if (notifRes.unreadCount > 0) {
+            apiFetch('/api/notifications/mark-all-read', { method: 'PATCH' }).catch(() => {});
+            setUnreadCount(0);
+          }
         }
       })
       .catch(() => {})
@@ -133,14 +138,9 @@ export default function Inbox() {
             ) : (
               <>
                 <div className="divide-y divide-parchment-100">
-                  {notifications.map((notification) => (
-                    <div
-                      key={notification._id}
-                      className={`p-4 hover:bg-parchment-50 transition-colors ${
-                        !notification.Read ? 'bg-blue-50/30' : ''
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
+                  {notifications.map((notification) => {
+                    const inner = (
+                      <>
                         <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
                           <Bell className="h-4 w-4 text-accent-primary" />
                         </div>
@@ -162,17 +162,29 @@ export default function Inbox() {
                             )}
                           </div>
                         </div>
-                        {notification.Link && (
-                          <Link
-                            to={notification.Link}
-                            className="text-accent-primary hover:underline text-xs shrink-0"
-                          >
-                            View
-                          </Link>
-                        )}
+                      </>
+                    );
+                    return notification.Link ? (
+                      <Link
+                        key={notification._id}
+                        to={notification.Link}
+                        className={`flex items-start gap-3 p-4 hover:bg-parchment-50 transition-colors ${
+                          !notification.Read ? 'bg-blue-50/30' : ''
+                        }`}
+                      >
+                        {inner}
+                      </Link>
+                    ) : (
+                      <div
+                        key={notification._id}
+                        className={`flex items-start gap-3 p-4 ${
+                          !notification.Read ? 'bg-blue-50/30' : ''
+                        }`}
+                      >
+                        {inner}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <div className="p-4 border-t border-parchment-200 text-center">
                   <Link

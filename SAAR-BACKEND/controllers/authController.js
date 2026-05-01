@@ -2,6 +2,8 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import User from '../models/User.js';
+import Note from '../models/Note.js';
+import PYQ from '../models/PYQ.js';
 import { sendEmail, passwordResetOTPEmail, emailVerificationEmail, welcomeEmail } from '../utils/email.js';
 
 const generateToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
@@ -40,75 +42,35 @@ const lockAccount = async (user) => {
 
 export const registerUser = async (req, res) => {
   try {
-    console.log('Registration request body:', req.body);
     const { Name, Email, Password, CollegeID } = req.body;
-    
     if (!Name || !Email || !Password) {
-      console.log('Missing required fields:', { Name: !!Name, Email: !!Email, Password: !!Password });
       return res.status(400).json({ success: false, message: 'Name, Email and Password are required' });
     }
-    
-    // Validate password strength
     const passwordValidation = validatePassword(Password);
     if (!passwordValidation.isValid) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Password does not meet requirements',
-        errors: passwordValidation.errors
-      });
+      return res.status(400).json({ success: false, message: 'Password does not meet requirements', errors: passwordValidation.errors });
     }
-    
     const existingUser = await User.findOne({ Email });
     if (existingUser) {
-      console.log('User already exists with email:', Email);
       return res.status(400).json({ success: false, message: 'User already exists' });
     }
-    
-    console.log('Creating new user...');
     const salt = await bcrypt.genSalt(10);
     const PasswordHash = await bcrypt.hash(Password, salt);
-    
-    // Generate email verification token
     const emailVerificationToken = crypto.randomBytes(32).toString('hex');
-    const emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
-    
-    const user = await User.create({ 
-      Name, 
-      Email, 
-      PasswordHash, 
-      Role: 'Student', 
-      CollegeID,
-      EmailVerificationToken: emailVerificationToken,
-      EmailVerificationExpires: emailVerificationExpires
-    });
-    console.log('User created successfully:', user._id);
-    
-    // Send verification email
+    const emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000;
+    const user = await User.create({ Name, Email, PasswordHash, Role: 'Student', CollegeID, EmailVerificationToken: emailVerificationToken, EmailVerificationExpires: emailVerificationExpires });
     try {
       await sendEmail(emailVerificationEmail(user.Email, user.Name, emailVerificationToken));
-      console.log('Verification email sent to:', user.Email);
     } catch (emailError) {
       console.error('Failed to send verification email:', emailError.message);
-      // Don't fail registration if email fails
     }
-    
-    // Get user data without sensitive fields
     const userData = await User.findById(user._id).select('-PasswordHash -EmailVerificationToken');
-    
-    const response = {
+    res.status(201).json({
       success: true,
       message: 'Registration successful! Please check your email to verify your account.',
-      data: { 
-        ...userData.toObject(), 
-        token: generateToken(user._id),
-        emailVerificationRequired: true
-      },
-    };
-    
-    console.log('Sending registration response');
-    res.status(201).json(response);
+      data: { ...userData.toObject(), token: generateToken(user._id), emailVerificationRequired: true },
+    });
   } catch (error) {
-    console.error('Registration error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -119,83 +81,40 @@ export const loginUser = async (req, res) => {
     if (!Email || !Password) {
       return res.status(400).json({ success: false, message: 'Email and Password are required' });
     }
-    
     const emailTrim = Email.trim();
     const escaped = emailTrim.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const user = await User.findOne({
       Email: { $regex: new RegExp(`^${escaped}$`, 'i') },
     }).select('+PasswordHash +LoginAttempts +AccountLocked +AccountLockedUntil');
-    
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
-    
-    // Check if account is locked
     if (isAccountLocked(user)) {
       const lockTimeRemaining = Math.ceil((user.AccountLockedUntil - Date.now()) / (1000 * 60));
-      return res.status(423).json({ 
-        success: false, 
-        message: `Account is locked. Try again in ${lockTimeRemaining} minutes.`,
-        accountLocked: true,
-        lockTimeRemaining
-      });
+      return res.status(423).json({ success: false, message: `Account is locked. Try again in ${lockTimeRemaining} minutes.`, accountLocked: true, lockTimeRemaining });
     }
-    
-    // Check password
     const isPasswordValid = await bcrypt.compare(Password, user.PasswordHash);
-    
     if (!isPasswordValid) {
-      // Increment failed login attempts
       user.LoginAttempts = (user.LoginAttempts || 0) + 1;
-      
-      // Lock account after 5 failed attempts
       if (user.LoginAttempts >= 5) {
         await lockAccount(user);
-        return res.status(423).json({ 
-          success: false, 
-          message: 'Account locked due to too many failed login attempts. Try again in 15 minutes.',
-          accountLocked: true
-        });
+        return res.status(423).json({ success: false, message: 'Account locked due to too many failed login attempts. Try again in 15 minutes.', accountLocked: true });
       }
-      
       await user.save();
       const attemptsRemaining = 5 - user.LoginAttempts;
-      return res.status(401).json({ 
-        success: false, 
-        message: `Invalid email or password. ${attemptsRemaining} attempts remaining.`,
-        attemptsRemaining
-      });
+      return res.status(401).json({ success: false, message: `Invalid email or password. ${attemptsRemaining} attempts remaining.`, attemptsRemaining });
     }
-    
-    // Successful login - reset attempts and update last login
     user.LoginAttempts = 0;
     user.AccountLocked = false;
     user.AccountLockedUntil = undefined;
     user.LastLogin = new Date();
     await user.save();
-    
-    // Get full user data without sensitive fields
     const userData = await User.findById(user._id).select('-PasswordHash -LoginAttempts -AccountLockedUntil');
-    
-    // Send welcome email for first login (if email is verified)
-    if (!user.LastLogin && userData.EmailVerified) {
-      try {
-        await sendEmail(welcomeEmail(userData.Email, userData.Name));
-      } catch (emailError) {
-        console.error('Failed to send welcome email:', emailError.message);
-      }
-    }
-    
     res.json({
       success: true,
-      data: { 
-        ...userData.toObject(), 
-        token: generateToken(user._id),
-        firstLogin: !user.LastLogin
-      },
+      data: { ...userData.toObject(), token: generateToken(user._id) },
     });
   } catch (error) {
-    console.error('Login error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -456,13 +375,9 @@ export const getBookmarks = async (req, res) => {
     const user = await User.findById(req.user._id).select('Bookmarks');
     const noteIds = user.Bookmarks.filter((b) => b.ResourceType === 'Note').map((b) => b.ResourceID);
     const pyqIds = user.Bookmarks.filter((b) => b.ResourceType === 'PYQ').map((b) => b.ResourceID);
-    const [{ default: Note }, { default: PYQ }] = await Promise.all([
-      import('../models/Note.js'),
-      import('../models/PYQ.js'),
-    ]);
     const [notes, pyqs] = await Promise.all([
-      Note.find({ _id: { $in: noteIds } }).populate('UploaderID', 'Name').select('Title Subject Semester CoverImage Likes Downloads'),
-      PYQ.find({ _id: { $in: pyqIds } }).populate('UploaderID', 'Name').select('Title Subject Semester Year ExamType Likes Downloads'),
+      Note.find({ _id: { $in: noteIds } }).populate('UploaderID', 'Name').select('Title Subject Semester CoverImage FileURL Likes Downloads'),
+      PYQ.find({ _id: { $in: pyqIds } }).populate('UploaderID', 'Name').select('Title Subject Semester Year ExamType FileURL Likes Downloads'),
     ]);
     res.json({ success: true, data: { notes, pyqs } });
   } catch (error) {
