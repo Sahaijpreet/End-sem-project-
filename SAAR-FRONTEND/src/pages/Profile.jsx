@@ -123,6 +123,8 @@ async function loadFollowers() {
 
   const avatarSrc = avatarPreview || (user?.Avatar ? fileUrl(user.Avatar) : null);
 
+  if (!user) return null;
+
   return (
     <div className="flex-1 min-h-[calc(100vh-4rem)] relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #fbf8f1 0%, #f4ebd8 40%, #fbf8f1 100%)' }}>
 
@@ -144,7 +146,8 @@ async function loadFollowers() {
             <div className="relative shrink-0">
               <div className="w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center overflow-hidden">
                 {avatarSrc ? (
-                  <img src={avatarSrc} alt="avatar" className="w-full h-full object-cover" />
+                  <img src={avatarSrc} alt="avatar" className="w-full h-full object-cover"
+                    onError={(e) => { e.target.style.display = 'none'; }} />
                 ) : (
                   <UserCircle className="h-12 w-12 text-accent-primary" />
                 )}
