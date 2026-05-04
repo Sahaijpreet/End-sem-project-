@@ -2,7 +2,6 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import mongoose from 'mongoose';
-import mongodb from 'mongodb';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -54,7 +53,19 @@ const httpServer = createServer(app);
 const PORT = process.env.PORT || 5001;
 
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || ['http://localhost:5173', 'http://127.0.0.1:5173'],
+  origin: (origin, callback) => {
+    const allowed = [
+      process.env.FRONTEND_URL,
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+    ].filter(Boolean);
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin || allowed.some((o) => origin.startsWith(o))) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS blocked: ${origin}`));
+    }
+  },
   credentials: true,
 };
 
