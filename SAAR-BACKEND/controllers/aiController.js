@@ -35,7 +35,7 @@ export const summarizeUpload = async (req, res) => {
     });
     // Clean up temp file after upload
     fs.unlink(filePath, () => {});
-    const prompt = 'Act as an expert university tutor. Extract the core concepts, key formulas, and an executive summary from this document. Format the response clearly.';
+    const prompt = 'Act as an expert university tutor. Extract the core concepts,key formulas, and an executive summary from this document. Format the response clearly.';
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
     const response = await model.generateContent([
       { fileData: { mimeType: uploadResult.file.mimeType, fileUri: uploadResult.file.uri } },
