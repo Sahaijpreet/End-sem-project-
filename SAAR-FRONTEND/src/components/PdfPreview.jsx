@@ -13,33 +13,52 @@ const SUBJECT_COLORS = {
 
 const blobCache = new Map();
 
+function getImageUrl(fileURL, coverImage) {
+  if (coverImage) return fileUrl(coverImage);
+  if (!fileURL) return null;
+  const ext = fileURL.split('.').pop().toLowerCase();
+  if (['jpg','jpeg','png','webp','gif'].includes(ext)) return fileUrl(fileURL);
+  return null;
+}
+
 export default function PdfPreview({ fileURL, coverImage, subject, title, className = 'w-full h-full' }) {
-  const imageUrl = coverImage ? fileUrl(coverImage) : null;
-  const [src, setSrc] = useState(() => blobCache.get(imageUrl) || '');
+  const imageUrl = getImageUrl(fileURL, coverImage);
+  const [src, setSrc] = useState(() => (imageUrl && blobCache.get(imageUrl)) || '');
   const containerRef = useRef(null);
 
   useEffect(() => {
     if (!imageUrl) return;
     if (blobCache.has(imageUrl)) { setSrc(blobCache.get(imageUrl)); return; }
 
-    const el = containerRef.current;
-    if (!el) return;
+    let cancelled = false;
 
-    const observer = new IntersectionObserver((entries) => {
-      if (!entries[0].isIntersecting) return;
-      observer.disconnect();
+    const load = () => {
       fetch(imageUrl)
         .then(r => r.blob())
         .then(blob => {
+          if (cancelled) return;
           const url = URL.createObjectURL(blob);
           blobCache.set(imageUrl, url);
           setSrc(url);
         })
         .catch(() => {});
+    };
+
+    const el = containerRef.current;
+    if (!el) { load(); return; }
+
+    // Check if already visible
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight + 200) { load(); return; }
+
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries[0].isIntersecting) return;
+      observer.disconnect();
+      load();
     }, { rootMargin: '200px' });
 
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => { cancelled = true; observer.disconnect(); };
   }, [imageUrl]);
 
   if (imageUrl) {
