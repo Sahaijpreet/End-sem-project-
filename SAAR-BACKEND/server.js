@@ -121,7 +121,12 @@ app.use('/api/auth/forgot-password', authLimiter);
 app.use('/api/notes', (req, res, next) => req.method === 'POST' ? uploadLimiter(req, res, next) : next());
 app.use('/api/pyqs', (req, res, next) => req.method === 'POST' ? uploadLimiter(req, res, next) : next());
 
-mongoose.connect(process.env.MONGO_URI)
+mongoose.connect(process.env.MONGO_URI, {
+  serverSelectionTimeoutMS: 30000,
+  socketTimeoutMS: 45000,
+  connectTimeoutMS: 30000,
+  maxPoolSize: 10,
+})
   .then(() => console.log('MongoDB Connected Successfully'))
   .catch(err => console.error('MongoDB Connection Error:', err));
 

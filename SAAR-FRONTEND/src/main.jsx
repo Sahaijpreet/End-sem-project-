@@ -6,11 +6,11 @@ import { ToastProvider } from './context/ToastContext.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 
 createRoot(document.getElementById('root')).render(
-    <ErrorBoundary>
-      <AuthProvider>
-        <ToastProvider>
-          <App />
-        </ToastProvider>
-      </AuthProvider>
-    </ErrorBoundary>
+  <ErrorBoundary>
+    <AuthProvider>
+      <ToastProvider>
+        <App />
+      </ToastProvider>
+    </AuthProvider>
+  </ErrorBoundary>
 );
